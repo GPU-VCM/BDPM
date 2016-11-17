@@ -1,4 +1,4 @@
-# CIS565 Final Project Proposal
+# CIS565 Final Project Proposal: VCM (Vertex Connection and Merging)
 #### Members : Akshay Shah, Kaixiang Miao
 ### Overview
 
