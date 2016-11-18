@@ -93,13 +93,17 @@ RT_PROGRAM void pathtrace_camera()
     float3 result = make_float3(0.0f);
 
     unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
+	int counter=0;
     do 
     {
+		
         //
         // Sample pixel using jittering
         //
         unsigned int x = samples_per_pixel%sqrt_num_samples;
         unsigned int y = samples_per_pixel/sqrt_num_samples;
+		//if (launch_index.x==1 && launch_index.y==1)
+		//	printf("sample:%d\n",counter++);
         float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
         float2 d = pixel + jitter*jitter_scale;
         float3 ray_origin = eye;
@@ -153,17 +157,19 @@ RT_PROGRAM void pathtrace_camera()
     // Update the output buffer
     //
     float3 pixel_color = result/(sqrt_num_samples*sqrt_num_samples);
+	
 
     if (frame_number > 1)
     {
         float a = 1.0f / (float)frame_number;
         float3 old_color = make_float3(output_buffer[launch_index]);
-        output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
+        //output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
     }
     else
     {
-        output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
+        //output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
     }
+	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
 }
 
 
@@ -228,7 +234,7 @@ RT_PROGRAM void diffuse()
     //
     unsigned int num_lights = lights.size();
     float3 result = make_float3(0.0f);
-
+	//result = diffuse_color;
     for(int i = 0; i < num_lights; ++i)
     {
         // Choose random point on light
@@ -252,7 +258,7 @@ RT_PROGRAM void diffuse()
             Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
             rtTrace(top_object, shadow_ray, shadow_prd);
 
-            //if(!shadow_prd.inShadow)
+            if(!shadow_prd.inShadow)
             {
                 const float A = length(cross(light.v1, light.v2));
                 // convert area based pdf to solid angle
@@ -278,57 +284,53 @@ RT_PROGRAM void specular()
     //
     current_prd.origin = hitpoint;
 
-    float z1=rnd(current_prd.seed);
-    float z2=rnd(current_prd.seed);
-    float3 p;
-    cosine_sample_hemisphere(z1, z2, p);
-    optix::Onb onb( ffnormal );
-    onb.inverse_transform( p );
-    current_prd.direction = p;
+    float3 R = reflect(ray.direction, ffnormal);
+    current_prd.direction = R;
 
     // NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
     // with cosine density.
-    current_prd.attenuation = current_prd.attenuation * diffuse_color;
-    current_prd.countEmitted = false;
+    current_prd.attenuation = current_prd.attenuation;
+    current_prd.countEmitted = true;
+
 
     //
     // Next event estimation (compute direct lighting).
     //
     unsigned int num_lights = lights.size();
     float3 result = make_float3(0.0f);
+	//result = diffuse_color;
+    //for(int i = 0; i < num_lights; ++i)
+    //{
+    //    // Choose random point on light
+    //    ParallelogramLight light = lights[i];
+    //    const float z1 = rnd(current_prd.seed);
+    //    const float z2 = rnd(current_prd.seed);
+    //    const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
 
-    for(int i = 0; i < num_lights; ++i)
-    {
-        // Choose random point on light
-        ParallelogramLight light = lights[i];
-        const float z1 = rnd(current_prd.seed);
-        const float z2 = rnd(current_prd.seed);
-        const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
+    //    // Calculate properties of light sample (for area based pdf)
+    //    const float  Ldist = length(light_pos - hitpoint);
+    //    const float3 L     = normalize(light_pos - hitpoint);
+    //    const float  nDl   = dot( ffnormal, L );
+    //    const float  LnDl  = dot( light.normal, L );
 
-        // Calculate properties of light sample (for area based pdf)
-        const float  Ldist = length(light_pos - hitpoint);
-        const float3 L     = normalize(light_pos - hitpoint);
-        const float  nDl   = dot( ffnormal, L );
-        const float  LnDl  = dot( light.normal, L );
+    //    // cast shadow ray
+    //    if ( nDl > 0.0f && LnDl > 0.0f )
+    //    {
+    //        PerRayData_pathtrace_shadow shadow_prd;
+    //        shadow_prd.inShadow = false;
+    //        // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
+    //        Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
+    //        rtTrace(top_object, shadow_ray, shadow_prd);
 
-        // cast shadow ray
-        if ( nDl > 0.0f && LnDl > 0.0f )
-        {
-            PerRayData_pathtrace_shadow shadow_prd;
-            shadow_prd.inShadow = false;
-            // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
-            Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
-            rtTrace(top_object, shadow_ray, shadow_prd);
-
-            //if(!shadow_prd.inShadow)
-            {
-                const float A = length(cross(light.v1, light.v2));
-                // convert area based pdf to solid angle
-                const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-                result += light.emission * weight;
-            }
-        }
-    }
+    //        if(!shadow_prd.inShadow)
+    //        {
+    //            const float A = length(cross(light.v1, light.v2));
+    //            // convert area based pdf to solid angle
+    //            const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
+    //            result += light.emission * weight;
+    //        }
+    //    }
+    //}
 
     current_prd.radiance = result;
 	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);

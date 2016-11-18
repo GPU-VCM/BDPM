@@ -297,24 +297,26 @@ void loadGeometry()
     const float3 green = make_float3( 0.05f, 0.8f, 0.05f );
     const float3 red   = make_float3( 0.8f, 0.05f, 0.05f );
     const float3 light_em = make_float3( 15.0f, 15.0f, 5.0f );
+	const float3 gray = make_float3(0.5f, 0.5f, 0.5f);
+	const float3 blue = make_float3(0.05f, 0.05f, 0.8f);
 
     // Floor
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
                                         make_float3( 0.0f, 0.0f, 559.2f ),
                                         make_float3( 556.0f, 0.0f, 0.0f ) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Ceiling
     gis.push_back( createParallelogram( make_float3( 0.0f, 548.8f, 0.0f ),
                                         make_float3( 556.0f, 0.0f, 0.0f ),
                                         make_float3( 0.0f, 0.0f, 559.2f ) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Back wall
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 559.2f),
                                         make_float3( 0.0f, 548.8f, 0.0f),
                                         make_float3( 556.0f, 0.0f, 0.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Right wall
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
@@ -394,7 +396,7 @@ void loadGeometry()
 	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
     // Create shadow group (no light)
 	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f));
-	setMaterial(gis.back(), specular, "diffuse_color", white);
+	setMaterial(gis.back(), specular, "diffuse_color", blue);
 
     GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
     shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
