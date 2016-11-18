@@ -2,7 +2,7 @@
 
 * `cd ${PATH}/VCMPathTracer`
 * `mkdir build`
-* `build`
+* `cd build`
 * `cmake-gui ..`
 * `configure`
 * `generate`
