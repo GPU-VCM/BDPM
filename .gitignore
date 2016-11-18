@@ -4,6 +4,7 @@
 *.vcxproj
 *.xcodeproj
 !*.dll
+!*.lib
 build
 
 # Created by https://www.gitignore.io/api/linux,osx,sublimetext,windows,jetbrains,vim,emacs,cmake,c++,cuda,visualstudio,webstorm,eclipse,xcode
@@ -208,7 +209,6 @@ install_manifest.txt
 *.lai
 *.la
 *.a
-*.lib
 
 # Executables
 *.exe
