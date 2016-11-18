@@ -76,6 +76,8 @@ int            sqrt_num_samples = 2;
 int            rr_begin_depth = 1;
 Program        pgram_intersection = 0;
 Program        pgram_bounding_box = 0;
+Program        sphere_intersection = 0;
+Program		   sphere_bounding_box = 0;
 
 // Camera state
 float3         camera_up;
@@ -195,6 +197,23 @@ GeometryInstance createParallelogram(
     return gi;
 }
 
+GeometryInstance createSphere(
+	const float3& center,
+	const float& radius)
+{
+	Geometry sphere = context->createGeometry();
+	sphere->setPrimitiveCount( 1u );
+	sphere->setIntersectionProgram( sphere_intersection );
+	sphere->setBoundingBoxProgram( sphere_bounding_box );
+
+	sphere["center"]->setFloat( center );
+	sphere["radius"]->setFloat( radius );
+
+	GeometryInstance gi = context->createGeometryInstance();
+	gi->setGeometry(sphere);
+	return gi;
+}
+
 
 void createContext()
 {
@@ -252,6 +271,12 @@ void loadGeometry()
     diffuse->setClosestHitProgram( 0, diffuse_ch );
     diffuse->setAnyHitProgram( 1, diffuse_ah );
 
+	Material specular = context->createMaterial();
+	Program specular_ch = context->createProgramFromPTXFile(ptx_path, "specular");
+	Program specular_ah = context->createProgramFromPTXFile(ptx_path, "shadow");
+	specular->setClosestHitProgram(0, specular_ch);
+	specular->setAnyHitProgram(1, specular_ah);
+
     Material diffuse_light = context->createMaterial();
     Program diffuse_em = context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
     diffuse_light->setClosestHitProgram( 0, diffuse_em );
@@ -260,6 +285,10 @@ void loadGeometry()
     ptx_path = ptxPath( "parallelogram.cu" );
     pgram_bounding_box = context->createProgramFromPTXFile( ptx_path, "bounds" );
     pgram_intersection = context->createProgramFromPTXFile( ptx_path, "intersect" );
+
+	ptx_path = ptxPath("sphere.cu");
+	sphere_bounding_box = context->createProgramFromPTXFile(ptx_path, "bounds");
+	sphere_intersection = context->createProgramFromPTXFile(ptx_path, "intersect");
 
     // create geometry instances
     std::vector<GeometryInstance> gis;
@@ -300,50 +329,73 @@ void loadGeometry()
     setMaterial(gis.back(), diffuse, "diffuse_color", red);
 
     // Short block
-    gis.push_back( createParallelogram( make_float3( 130.0f, 165.0f, 65.0f),
-                                        make_float3( -48.0f, 0.0f, 160.0f),
-                                        make_float3( 160.0f, 0.0f, 49.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 290.0f, 0.0f, 114.0f),
-                                        make_float3( 0.0f, 165.0f, 0.0f),
-                                        make_float3( -50.0f, 0.0f, 158.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 130.0f, 0.0f, 65.0f),
-                                        make_float3( 0.0f, 165.0f, 0.0f),
-                                        make_float3( 160.0f, 0.0f, 49.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 82.0f, 0.0f, 225.0f),
-                                        make_float3( 0.0f, 165.0f, 0.0f),
-                                        make_float3( 48.0f, 0.0f, -160.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 240.0f, 0.0f, 272.0f),
-                                        make_float3( 0.0f, 165.0f, 0.0f),
-                                        make_float3( -158.0f, 0.0f, -47.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 130.0f, 165.0f, 65.0f),
+    //                                    make_float3( -48.0f, 0.0f, 160.0f),
+    //                                    make_float3( 160.0f, 0.0f, 49.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createParallelogram( make_float3( 290.0f, 0.0f, 114.0f),
+	//	make_float3( 0.0f, 165.0f, 0.0f),
+	//	make_float3( -50.0f, 0.0f, 158.0f) ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 130.0f, 0.0f, 65.0f),
+    //                                    make_float3( 0.0f, 165.0f, 0.0f),
+    //                                    make_float3( 160.0f, 0.0f, 49.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 82.0f, 0.0f, 225.0f),
+    //                                    make_float3( 0.0f, 165.0f, 0.0f),
+    //                                    make_float3( 48.0f, 0.0f, -160.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 240.0f, 0.0f, 272.0f),
+    //                                    make_float3( 0.0f, 165.0f, 0.0f),
+    //                                    make_float3( -158.0f, 0.0f, -47.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
     // Tall block
-    gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
-                                        make_float3( -158.0f, 0.0f, 49.0f),
-                                        make_float3( 49.0f, 0.0f, 159.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-                                        make_float3( 49.0f, 0.0f, 159.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-                                        make_float3( -158.0f, 0.0f, 50.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-                                        make_float3( -49.0f, 0.0f, -160.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-                                        make_float3( 158.0f, 0.0f, -49.0f) ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
+    //                                    make_float3( -158.0f, 0.0f, 49.0f),
+    //                                    make_float3( 49.0f, 0.0f, 159.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
+    //                                    make_float3( 0.0f, 330.0f, 0.0f),
+    //                                    make_float3( 49.0f, 0.0f, 159.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
+    //                                    make_float3( 0.0f, 330.0f, 0.0f),
+    //                                    make_float3( -158.0f, 0.0f, 50.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
+    //                                    make_float3( 0.0f, 330.0f, 0.0f),
+    //                                    make_float3( -49.0f, 0.0f, -160.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
+    //                                    make_float3( 0.0f, 330.0f, 0.0f),
+    //                                    make_float3( 158.0f, 0.0f, -49.0f) ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
+	//gis.push_back( createSphere( make_float3( 423.0f, 330.0f, 247.0f),
+	//	make_float3( -158.0f, 0.0f, 49.0f),
+	//	make_float3( 49.0f, 0.0f, 159.0f) ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createSphere( make_float3( 423.0f, 0.0f, 247.0f),
+	//	make_float3( 0.0f, 330.0f, 0.0f),
+	//	make_float3( 49.0f, 0.0f, 159.0f) ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createSphere( make_float3( 472.0f, 0.0f, 406.0f),
+	//	make_float3( 0.0f, 330.0f, 0.0f),
+	//	make_float3( -158.0f, 0.0f, 50.0f) ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createSphere( make_float3( 314.0f, 0.0f, 456.0f),
+	//	make_float3( 0.0f, 330.0f, 0.0f),
+	//	make_float3( -49.0f, 0.0f, -160.0f) ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createSphere( make_float3( 265.0f, 0.0f, 296.0f),
+	//	make_float3( 0.0f, 330.0f, 0.0f),
+	//	make_float3( 158.0f, 0.0f, -49.0f) ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
     // Create shadow group (no light)
+	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f));
+	setMaterial(gis.back(), specular, "diffuse_color", white);
+
     GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
     shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
     context["top_shadower"]->set( shadow_group );
@@ -648,7 +700,7 @@ int main( int argc, char** argv )
             sutil::displayBufferPPM( out_file.c_str(), getOutputBuffer() );
             destroyContext();
         }
-
+		
         return 0;
     }
     SUTIL_CATCH( context->get() )

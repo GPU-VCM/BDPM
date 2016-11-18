@@ -34,12 +34,12 @@ rtDeclareVariable(float4, plane, , );
 rtDeclareVariable(float3, v1, , );
 rtDeclareVariable(float3, v2, , );
 rtDeclareVariable(float3, anchor, , );
-rtDeclareVariable(int, lgt_instance, , ) = {0};
+//rtDeclareVariable(int, lgt_instance, , ) = {0};
 
 rtDeclareVariable(float3, texcoord, attribute texcoord, ); 
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, ); 
 rtDeclareVariable(float3, shading_normal, attribute shading_normal, ); 
-rtDeclareVariable(int, lgt_idx, attribute lgt_idx, ); 
+//rtDeclareVariable(int, lgt_idx, attribute lgt_idx, ); 
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 
 RT_PROGRAM void intersect(int primIdx)
@@ -48,6 +48,7 @@ RT_PROGRAM void intersect(int primIdx)
   float dt = dot(ray.direction, n );
   float t = (plane.w - dot(n, ray.origin))/dt;
   if( t > ray.tmin && t < ray.tmax ) {
+	  //printf("%f %f\n", ray.tmin, ray.tmax);
     float3 p = ray.origin + ray.direction * t;
     float3 vi = p - anchor;
     float a1 = dot(v1, vi);
@@ -57,7 +58,7 @@ RT_PROGRAM void intersect(int primIdx)
         if( rtPotentialIntersection( t ) ) {
           shading_normal = geometric_normal = n;
           texcoord = make_float3(a1,a2,0);
-          lgt_idx = lgt_instance;
+          //lgt_idx = lgt_instance;
           rtReportIntersection( 0 );
         }
       }

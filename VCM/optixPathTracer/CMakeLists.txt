@@ -39,6 +39,7 @@ if(GLUT_FOUND AND OPENGL_FOUND)
 
         # These files are common among multiple samples
         parallelogram.cu
+        sphere.cu
         random.h
         )
 else()

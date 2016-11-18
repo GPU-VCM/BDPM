@@ -41,6 +41,7 @@
   }                                                                \
   catch( std::exception& e ) {                                     \
     sutil::reportErrorMessage( e.what() );                         \
+	system("pause");											   \
     exit(1);                                                       \
   }
 
