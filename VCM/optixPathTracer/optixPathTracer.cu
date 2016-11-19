@@ -269,6 +269,7 @@ RT_PROGRAM void diffuse()
     }
 
     current_prd.radiance = result;
+	
 	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 

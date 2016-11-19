@@ -44,6 +44,8 @@ struct PerRayData_pathtrace
     int depth;
     int countEmitted;
     int done;
+
+	float tValue;
 };
 
 struct PerRayData_pathtrace_shadow
@@ -204,7 +206,7 @@ rtDeclareVariable(float3,     geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
 rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, );
 rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
-
+rtDeclareVariable(float, tValue, attribute tValue, );
 
 RT_PROGRAM void diffuse()
 {
@@ -274,6 +276,7 @@ RT_PROGRAM void diffuse()
     }
 
     current_prd.radiance = result;
+	current_prd.tValue = tValue;
 	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 

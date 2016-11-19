@@ -9,7 +9,6 @@ rtDeclareVariable(float, radius, , );
 rtDeclareVariable(float3, world_normal, attribute world_normal, ); 
 //rtDeclareVariable(int, lgt_idx, attribute lgt_idx, ); 
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
-
 rtBuffer<float3, 1>              Aabb_buffer;
 
 RT_PROGRAM void intersect(int primIdx)
