@@ -261,6 +261,8 @@ void createPrePassContext()
 	prepass_context["output_buffer"]->set( buffer );
 	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2 * width * height);
 	prepass_context["photonBuffer"]->set(photonBuffer);
+	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, width * height);
+	prepass_context["isHitBuffer"]->set(isHitBuffer);
 
 	// Setup programs
 	const std::string cuda_file = "photonPrePass.cu";

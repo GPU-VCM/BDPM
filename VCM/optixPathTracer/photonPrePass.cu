@@ -83,6 +83,7 @@ rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
 
 rtBuffer<float3>	photonBuffer;
+rtBuffer<int>	isHitBuffer;
 
 
 RT_PROGRAM void pathtrace_camera()
@@ -97,6 +98,8 @@ RT_PROGRAM void pathtrace_camera()
     float3 result = make_float3(0.0f);
 
     unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
+
+	int index = screen.x*launch_index.y+launch_index.x;
 	//int counter=0;
     //do 
     //{
@@ -113,6 +116,9 @@ RT_PROGRAM void pathtrace_camera()
         float3 ray_origin = eye;
         float3 ray_direction = normalize(d.x*U + d.y*V + W);
 
+		float3 firstRay_direction = ray_direction;
+		bool firstIntersection = false;
+		float t;
         // Initialze per-ray data
         PerRayData_pathtrace prd;
         prd.result = make_float3(0.f);
@@ -121,7 +127,7 @@ RT_PROGRAM void pathtrace_camera()
         prd.done = false;
         prd.seed = seed;
         prd.depth = 0;
-
+		
         // Each iteration is a segment of the ray path.  The closest hit will
         // return new segments to be traced here.
         for(;;)
@@ -135,7 +141,11 @@ RT_PROGRAM void pathtrace_camera()
                 prd.result += prd.radiance * prd.attenuation;
                 break;
             }
-
+			if (!firstIntersection)
+			{
+				firstIntersection = true;
+				t = prd.tValue;
+			}
             // Russian roulette termination 
             if(prd.depth >= rr_begin_depth)
             {
@@ -174,7 +184,14 @@ RT_PROGRAM void pathtrace_camera()
         output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
     }
 
-	//photonBuffer[launch_index * 2] = ;
+	if (firstIntersection)
+		isHitBuffer[index] = 1;
+	else
+		isHitBuffer[index] = 0;
+
+	photonBuffer[index * 2] = eye + t * firstRay_direction; // photon world position
+	photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]); // photon color
+
 	//printf("%f %f %f\n", pixel_color.x, pixel_color.y, pixel_color.z);
 	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
 }
