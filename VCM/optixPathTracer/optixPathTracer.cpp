@@ -103,8 +103,9 @@ int            mouse_button;
 
 std::vector<Buffer> vAabbBuffer;
 
-Context		    prepass_context = 0;
-float3	 lightPos; // used for pre-pass stage
+Context	prepass_context = 0;
+float3	lightPos; // used for pre-pass stage
+Buffer	photonBuffer;
 
 //------------------------------------------------------------------------------
 //
@@ -258,6 +259,8 @@ void createPrePassContext()
 
 	Buffer buffer = sutil::createOutputBuffer( prepass_context, RT_FORMAT_FLOAT4, width, height, use_pbo );
 	prepass_context["output_buffer"]->set( buffer );
+	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2 * width * height);
+	prepass_context["photonBuffer"]->set(photonBuffer);
 
 	// Setup programs
 	const std::string cuda_file = "photonPrePass.cu";
@@ -668,7 +671,7 @@ void updateCamera()
 
 void updatePrePassCamera()
 {
-	const float fov  = 170.0f;
+	const float fov  = 150.0f;
 	const float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
 
 	float3 camera_u, camera_v, camera_w;
@@ -835,6 +838,61 @@ void drawBoundingBox()
 	glEnd();
 }
 
+void drawPrePassBoundingBox()
+{
+	glMatrixMode (GL_PROJECTION);  
+	glLoadIdentity ();  
+	gluPerspective(150.0, (GLfloat) width/(GLfloat) height, 0.01, 20000.0);  
+	glMatrixMode(GL_MODELVIEW);  
+	glLoadIdentity();  
+	gluLookAt(prepass_camera_eye.x, prepass_camera_eye.y, prepass_camera_eye.z,
+		prepass_camera_lookat.x, prepass_camera_lookat.y, prepass_camera_lookat.z,
+		prepass_camera_up.x, prepass_camera_up.y, prepass_camera_up.z);
+
+	glColor3f(0.0f, 0.0f, 1.0f);
+
+	glBegin(GL_LINES);
+
+	int size = vAabbBuffer.size();
+	for (int i = 0; i < size; i++)
+	{
+		GLvoid* data = 0;
+		RT_CHECK_ERROR(rtBufferMap(vAabbBuffer[i]->get(), &data));
+		float *f = (float*)data;
+		glVertex3f(f[0], f[1], f[2]);
+		glVertex3f(f[0], f[4], f[2]);
+		glVertex3f(f[0], f[1], f[2]);
+		glVertex3f(f[0], f[1], f[5]);
+		glVertex3f(f[0], f[1], f[2]);
+		glVertex3f(f[3], f[1], f[2]);
+
+		glVertex3f(f[3], f[1], f[5]);
+		glVertex3f(f[3], f[4], f[5]);
+		glVertex3f(f[3], f[1], f[5]);
+		glVertex3f(f[0], f[1], f[5]);
+		glVertex3f(f[3], f[1], f[5]);
+		glVertex3f(f[3], f[1], f[2]);
+
+		glVertex3f(f[3], f[4], f[2]);
+		glVertex3f(f[3], f[1], f[2]);
+		glVertex3f(f[3], f[4], f[2]);
+		glVertex3f(f[3], f[4], f[5]);
+		glVertex3f(f[3], f[4], f[2]);
+		glVertex3f(f[0], f[4], f[2]);
+
+		glVertex3f(f[0], f[4], f[5]);
+		glVertex3f(f[0], f[1], f[5]);
+		glVertex3f(f[0], f[4], f[5]);
+		glVertex3f(f[3], f[4], f[5]);
+		glVertex3f(f[0], f[4], f[5]);
+		glVertex3f(f[0], f[4], f[2]);
+		//printf("%f %f %f %f %f %f\n", f[0], f[1], f[2], f[3], f[4], f[5]);
+		RT_CHECK_ERROR(rtBufferUnmap(vAabbBuffer[i]->get()));
+	}
+
+	glEnd();
+}
+
 void testGetBuffer()
 {
 	int size = vAabbBuffer.size();
@@ -869,8 +927,9 @@ void glutPrePassDisplay()
 {
 	updatePrePassCamera();
 	prepass_context->launch(0, width, height);
-
+	
 	sutil::displayBufferGL( prepass_context["output_buffer"]->getBuffer() );
+	drawPrePassBoundingBox();
 	static unsigned prepass_frame_count = 0;
 	sutil::displayFps(prepass_frame_count++);
 

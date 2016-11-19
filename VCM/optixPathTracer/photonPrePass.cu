@@ -80,6 +80,8 @@ rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
 
+rtBuffer<float3>	photonBuffer;
+
 
 RT_PROGRAM void pathtrace_camera()
 {
@@ -94,18 +96,18 @@ RT_PROGRAM void pathtrace_camera()
 
     unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
 	//int counter=0;
-    do 
-    {
+    //do 
+    //{
 		
         //
         // Sample pixel using jittering
         //
-        unsigned int x = samples_per_pixel%sqrt_num_samples;
-        unsigned int y = samples_per_pixel/sqrt_num_samples;
+        //unsigned int x = samples_per_pixel%sqrt_num_samples;
+       //unsigned int y = samples_per_pixel/sqrt_num_samples;
 		//if (launch_index.x==1 && launch_index.y==1)
 		//	printf("sample:%d\n",counter++);
-        float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
-        float2 d = pixel + jitter*jitter_scale;
+        //float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
+        float2 d = pixel;// + jitter*jitter_scale;
         float3 ray_origin = eye;
         float3 ray_direction = normalize(d.x*U + d.y*V + W);
 
@@ -151,7 +153,7 @@ RT_PROGRAM void pathtrace_camera()
 
         result += prd.result;
         seed = prd.seed;
-    } while (--samples_per_pixel);
+    //} while (--samples_per_pixel);
 
     //
     // Update the output buffer
@@ -169,6 +171,8 @@ RT_PROGRAM void pathtrace_camera()
     {
         output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
     }
+
+	//photonBuffer[launch_index * 2] = ;
 	//printf("%f %f %f\n", pixel_color.x, pixel_color.y, pixel_color.z);
 	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
 }

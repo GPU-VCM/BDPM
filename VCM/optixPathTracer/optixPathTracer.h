@@ -38,3 +38,8 @@ struct ParallelogramLight
     optix::float3 emission;                                                        
 };                                                                               
 
+struct Photon
+{
+	optix::float3 position;
+	optix::float3 color;
+};
