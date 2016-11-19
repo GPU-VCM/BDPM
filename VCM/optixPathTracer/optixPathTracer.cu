@@ -93,7 +93,7 @@ RT_PROGRAM void pathtrace_camera()
     float3 result = make_float3(0.0f);
 
     unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
-	int counter=0;
+	//int counter=0;
     do 
     {
 		
@@ -163,11 +163,11 @@ RT_PROGRAM void pathtrace_camera()
     {
         float a = 1.0f / (float)frame_number;
         float3 old_color = make_float3(output_buffer[launch_index]);
-        //output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
+        output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
     }
     else
     {
-        //output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
+        output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
     }
 	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
 }

@@ -55,6 +55,8 @@
 #include <cstring>
 #include <iostream>
 #include <stdint.h>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
 
 using namespace optix;
 
@@ -84,12 +86,15 @@ float3         camera_up;
 float3         camera_lookat;
 float3         camera_eye;
 Matrix4x4      camera_rotate;
+glm::mat4x4	   mvp;
 bool           camera_changed = true;
 sutil::Arcball arcball;
 
 // Mouse state
 int2           mouse_prev_pos;
 int            mouse_button;
+
+std::vector<Buffer> vAabbBuffer;
 
 
 //------------------------------------------------------------------------------
@@ -192,6 +197,10 @@ GeometryInstance createParallelogram(
     parallelogram["v1"]->setFloat( v1 );
     parallelogram["v2"]->setFloat( v2 );
 
+	Buffer AabbBuffer = context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2);
+	parallelogram["Aabb_buffer"]->set(AabbBuffer);
+	vAabbBuffer.push_back(AabbBuffer);
+
     GeometryInstance gi = context->createGeometryInstance();
     gi->setGeometry(parallelogram);
     return gi;
@@ -208,6 +217,10 @@ GeometryInstance createSphere(
 
 	sphere["center"]->setFloat( center );
 	sphere["radius"]->setFloat( radius );
+
+	Buffer AabbBuffer = context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2);
+	sphere["Aabb_buffer"]->set(AabbBuffer);
+	vAabbBuffer.push_back(AabbBuffer);
 
 	GeometryInstance gi = context->createGeometryInstance();
 	gi->setGeometry(sphere);
@@ -460,6 +473,17 @@ void updateCamera()
     context[ "V"  ]->setFloat( camera_v );
     context[ "W"  ]->setFloat( camera_w );
 
+	float3 F = normalize(camera_lookat - camera_eye);
+	float3 R = normalize( cross( F, camera_up ) );
+	float3 U = normalize( cross( R, F ) );
+
+	glm::mat4x4 projectionMatrix = glm::perspective(fov, aspect_ratio, 0.01f, 1000.f);
+	glm::mat4x4 viewMatrix = glm::mat4x4(R.x, U.x, F.x, 0.0f,
+										 R.y, U.y, F.y, 0.0f,
+										 R.z, U.z, F.z, 0.0f,
+										 -camera_eye.x, -camera_eye.y, -camera_eye.z, 1.0f);
+	mvp = projectionMatrix * viewMatrix;
+
     if( camera_changed ) // reset accumulation
         frame_number = 1;
     camera_changed = false;
@@ -512,19 +536,89 @@ void glutRun()
 //
 //------------------------------------------------------------------------------
 
+void drawBoundingBox()
+{
+	glMatrixMode (GL_PROJECTION);  
+	glLoadIdentity ();  
+	gluPerspective(35.0, (GLfloat) width/(GLfloat) height, 0.01, 20000.0);  
+	glMatrixMode(GL_MODELVIEW);  
+	glLoadIdentity();  
+	gluLookAt(camera_eye.x, camera_eye.y, camera_eye.z,
+		camera_lookat.x, camera_lookat.y, camera_lookat.z,
+		camera_up.x, camera_up.y, camera_up.z);
+
+	glColor3f(0.0f, 0.0f, 1.0f);
+
+	glBegin(GL_LINES);
+
+	int size = vAabbBuffer.size();
+	for (int i = 0; i < size; i++)
+	{
+		GLvoid* data = 0;
+		RT_CHECK_ERROR(rtBufferMap(vAabbBuffer[i]->get(), &data));
+		float *f = (float*)data;
+		glVertex3f(f[0], f[1], f[2]);
+		glVertex3f(f[0], f[4], f[2]);
+		glVertex3f(f[0], f[1], f[2]);
+		glVertex3f(f[0], f[1], f[5]);
+		glVertex3f(f[0], f[1], f[2]);
+		glVertex3f(f[3], f[1], f[2]);
+
+		glVertex3f(f[3], f[1], f[5]);
+		glVertex3f(f[3], f[4], f[5]);
+		glVertex3f(f[3], f[1], f[5]);
+		glVertex3f(f[0], f[1], f[5]);
+		glVertex3f(f[3], f[1], f[5]);
+		glVertex3f(f[3], f[1], f[2]);
+
+		glVertex3f(f[3], f[4], f[2]);
+		glVertex3f(f[3], f[1], f[2]);
+		glVertex3f(f[3], f[4], f[2]);
+		glVertex3f(f[3], f[4], f[5]);
+		glVertex3f(f[3], f[4], f[2]);
+		glVertex3f(f[0], f[4], f[2]);
+
+		glVertex3f(f[0], f[4], f[5]);
+		glVertex3f(f[0], f[1], f[5]);
+		glVertex3f(f[0], f[4], f[5]);
+		glVertex3f(f[3], f[4], f[5]);
+		glVertex3f(f[0], f[4], f[5]);
+		glVertex3f(f[0], f[4], f[2]);
+		//printf("%f %f %f %f %f %f\n", f[0], f[1], f[2], f[3], f[4], f[5]);
+		RT_CHECK_ERROR(rtBufferUnmap(vAabbBuffer[i]->get()));
+	}
+
+	glEnd();
+}
+
+void testGetBuffer()
+{
+	int size = vAabbBuffer.size();
+	for (int i = 0; i < size; i++)
+	{
+		GLvoid* data = 0;
+		RT_CHECK_ERROR(rtBufferMap(vAabbBuffer[i]->get(), &data));
+		float *f = (float*)data;
+		printf("%f %f %f %f %f %f\n", f[0], f[1], f[2], f[3], f[4], f[5]);
+		RT_CHECK_ERROR(rtBufferUnmap(vAabbBuffer[i]->get()));
+	}
+}
+
 void glutDisplay()
 {
+	//testGetBuffer();
     updateCamera();
     context->launch( 0, width, height );
 
     sutil::displayBufferGL( getOutputBuffer() );
-
+	drawBoundingBox();
     {
       static unsigned frame_count = 0;
       sutil::displayFps( frame_count++ );
     }
 
     glutSwapBuffers();
+	
 }
 
 

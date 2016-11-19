@@ -10,6 +10,8 @@ rtDeclareVariable(float3, world_normal, attribute world_normal, );
 //rtDeclareVariable(int, lgt_idx, attribute lgt_idx, ); 
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 
+rtBuffer<float3, 1>              Aabb_buffer;
+
 RT_PROGRAM void intersect(int primIdx)
 {
 	//printf("TESTING SPHERE\n");
@@ -30,12 +32,14 @@ RT_PROGRAM void intersect(int primIdx)
 	}
 }
 
-RT_PROGRAM void bounds (int, float result[6])
+RT_PROGRAM void bounds (int primIdx, float result[6])
 {
-  optix::Aabb* aabb = (optix::Aabb*)result;
+	optix::Aabb* aabb = (optix::Aabb*)result;
 
-  aabb->m_min = center - make_float3(radius);
-  aabb->m_max = center + make_float3(radius);
-  //aabb->m_min = make_float3(-1000.f, -1000.f, -1000.f);
-  //aabb->m_max = make_float3(1000.f, 1000.f, 1000.f);
+	aabb->m_min = center - make_float3(radius);
+	aabb->m_max = center + make_float3(radius);
+
+	Aabb_buffer[0] = aabb->m_min;
+	Aabb_buffer[1] = aabb->m_max;
+	//printf("AABB\n");
 }
