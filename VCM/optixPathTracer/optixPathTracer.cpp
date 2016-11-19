@@ -104,7 +104,7 @@ int            mouse_button;
 std::vector<Buffer> vAabbBuffer;
 
 Context		    prepass_context = 0;
-
+float3	 lightPos; // used for pre-pass stage
 
 //------------------------------------------------------------------------------
 //
@@ -134,6 +134,7 @@ void setupPrePassCamera();
 void glutPrePassRun();
 void glutPrePassDisplay();
 void loadPrePassGeometry();
+void glutPrePassMouseMotion(int x, int y);
 
 //------------------------------------------------------------------------------
 //
@@ -582,6 +583,7 @@ void loadPrePassGeometry()
 		make_float3( 0.0f, 0.0f, 105.0f),
 		prepass_context) );
 	setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
+	lightPos = make_float3( 343.0f, 548.6f, 227.0f);
 
 	// Create geometry group
 	GeometryGroup geometry_group = prepass_context->createGeometryGroup(gis.begin(), gis.end());
@@ -601,8 +603,14 @@ void setupCamera()
 void setupPrePassCamera()
 {
 	prepass_camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
+	prepass_camera_eye    = make_float3( 343.0f, 548.6f, 227.0f );
 	prepass_camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
+	prepass_camera_lookat = make_float3( 278.0f, 0.0f,    250.0f );
 	prepass_camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
+
+	//prepass_camera_eye    = lightPos - make_float3(0.0f, 50.0f, 0.0f); 
+	//prepass_camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
+	//prepass_camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
 
 	prepass_camera_rotate = Matrix4x4::identity();
 }
@@ -660,7 +668,7 @@ void updateCamera()
 
 void updatePrePassCamera()
 {
-	const float fov  = 35.0f;
+	const float fov  = 170.0f;
 	const float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
 
 	float3 camera_u, camera_v, camera_w;
@@ -698,6 +706,7 @@ void updatePrePassCamera()
 	prepass_camera_changed = false;
 
 }
+
 void glutInitialize( int* argc, char** argv )
 {
     glutInit( argc, argv );
@@ -758,7 +767,7 @@ void glutPrePassRun()
 	glutReshapeFunc( glutResize );
 	//glutKeyboardFunc( glutKeyboardPress );
 	//glutMouseFunc( glutMousePress );
-	//glutMotionFunc( glutMouseMotion );
+	glutMotionFunc( glutPrePassMouseMotion );
 
 	registerExitHandler();
 
@@ -934,6 +943,35 @@ void glutMouseMotion( int x, int y)
     mouse_prev_pos = make_int2( x, y );
 }
 
+void glutPrePassMouseMotion( int x, int y)
+{
+	if( mouse_button == GLUT_RIGHT_BUTTON )
+	{
+		const float dx = static_cast<float>( x - mouse_prev_pos.x ) /
+			static_cast<float>( width );
+		const float dy = static_cast<float>( y - mouse_prev_pos.y ) /
+			static_cast<float>( height );
+		const float dmax = fabsf( dx ) > fabs( dy ) ? dx : dy;
+		const float scale = std::min<float>( dmax, 0.9f );
+		prepass_camera_eye = prepass_camera_eye + (prepass_camera_lookat - prepass_camera_eye)*scale;
+		prepass_camera_changed = true;
+	}
+	else if( mouse_button == GLUT_LEFT_BUTTON )
+	{
+		const float2 from = { static_cast<float>(mouse_prev_pos.x),
+			static_cast<float>(mouse_prev_pos.y) };
+		const float2 to   = { static_cast<float>(x),
+			static_cast<float>(y) };
+
+		const float2 a = { from.x / width, from.y / height };
+		const float2 b = { to.x   / width, to.y   / height };
+
+		prepass_camera_rotate = arcball.rotate( b, a );
+		prepass_camera_changed = true;
+	}
+
+	mouse_prev_pos = make_int2( x, y );
+}
 
 void glutResize( int w, int h )
 {
