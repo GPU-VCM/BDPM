@@ -37,10 +37,11 @@ if(GLUT_FOUND AND OPENGL_FOUND)
         optixPathTracer.cu
         optixPathTracer.h
 
-        # These files are common among multiple samples
         parallelogram.cu
         sphere.cu
         random.h
+
+        photonPrePass.cu
         )
 else()
     # GLUT or OpenGL not found

@@ -468,9 +468,11 @@ void sutil::displayBufferPPM( const char* filename, RTbuffer buffer)
 void sutil::displayBufferGL( optix::Buffer buffer )
 {
 	glColor3f(1.0f, 1.0f, 1.0f);
-	glMatrixMode (GL_PROJECTION);  
-	glLoadIdentity ();  
-	glMatrixMode(GL_MODELVIEW);  
+	glMatrixMode(GL_PROJECTION);                                                   
+	glLoadIdentity();                                                              
+	glOrtho(0, 1, 0, 1, -1, 1 );                                                   
+
+	glMatrixMode(GL_MODELVIEW);                                                    
 	glLoadIdentity();  
     // Query buffer information
     RTsize buffer_width_rts, buffer_height_rts;
@@ -539,16 +541,16 @@ void sutil::displayBufferGL( optix::Buffer buffer )
 
         glBegin(GL_QUADS);
         glTexCoord2f( 0.0f, 0.0f );
-        glVertex2f( -1.0f, -1.0f );
+        glVertex2f( 0.0f, 0.0f );
 
         glTexCoord2f( 1.0f, 0.0f );
-        glVertex2f( 1.0f, -1.0f);
+        glVertex2f( 1.0f, 0.0f);
 
         glTexCoord2f( 1.0f, 1.0f );
         glVertex2f( 1.0f, 1.0f );
 
         glTexCoord2f(0.0f, 1.0f );
-        glVertex2f( -1.0f, 1.0f );
+        glVertex2f( 0.0f, 1.0f );
         glEnd();
 
         glDisable(GL_TEXTURE_2D);

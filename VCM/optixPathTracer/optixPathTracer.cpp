@@ -86,15 +86,24 @@ float3         camera_up;
 float3         camera_lookat;
 float3         camera_eye;
 Matrix4x4      camera_rotate;
-glm::mat4x4	   mvp;
 bool           camera_changed = true;
 sutil::Arcball arcball;
+
+// Pre-pass camera
+float3	prepass_camera_up;
+float3	prepass_camera_lookat;
+float3	prepass_camera_eye;
+Matrix4x4	prepass_camera_rotate;
+bool	prepass_camera_changed = true;
+int	prepass_frame_number = 1;
 
 // Mouse state
 int2           mouse_prev_pos;
 int            mouse_button;
 
 std::vector<Buffer> vAabbBuffer;
+
+Context		    prepass_context = 0;
 
 
 //------------------------------------------------------------------------------
@@ -120,6 +129,11 @@ void glutMousePress( int button, int state, int x, int y );
 void glutMouseMotion( int x, int y);
 void glutResize( int w, int h );
 
+void createPrePassContext();
+void setupPrePassCamera();
+void glutPrePassRun();
+void glutPrePassDisplay();
+void loadPrePassGeometry();
 
 //------------------------------------------------------------------------------
 //
@@ -178,9 +192,10 @@ void setMaterial(
 GeometryInstance createParallelogram(
         const float3& anchor,
         const float3& offset1,
-        const float3& offset2)
+        const float3& offset2,
+		Context& crtContext)
 {
-    Geometry parallelogram = context->createGeometry();
+    Geometry parallelogram = crtContext->createGeometry();
     parallelogram->setPrimitiveCount( 1u );
     parallelogram->setIntersectionProgram( pgram_intersection );
     parallelogram->setBoundingBoxProgram( pgram_bounding_box );
@@ -197,20 +212,21 @@ GeometryInstance createParallelogram(
     parallelogram["v1"]->setFloat( v1 );
     parallelogram["v2"]->setFloat( v2 );
 
-	Buffer AabbBuffer = context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2);
+	Buffer AabbBuffer = crtContext->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2);
 	parallelogram["Aabb_buffer"]->set(AabbBuffer);
 	vAabbBuffer.push_back(AabbBuffer);
 
-    GeometryInstance gi = context->createGeometryInstance();
+    GeometryInstance gi = crtContext->createGeometryInstance();
     gi->setGeometry(parallelogram);
     return gi;
 }
 
 GeometryInstance createSphere(
 	const float3& center,
-	const float& radius)
+	const float& radius,
+	Context& crtContext)
 {
-	Geometry sphere = context->createGeometry();
+	Geometry sphere = crtContext->createGeometry();
 	sphere->setPrimitiveCount( 1u );
 	sphere->setIntersectionProgram( sphere_intersection );
 	sphere->setBoundingBoxProgram( sphere_bounding_box );
@@ -218,15 +234,41 @@ GeometryInstance createSphere(
 	sphere["center"]->setFloat( center );
 	sphere["radius"]->setFloat( radius );
 
-	Buffer AabbBuffer = context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2);
+	Buffer AabbBuffer = crtContext->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2);
 	sphere["Aabb_buffer"]->set(AabbBuffer);
 	vAabbBuffer.push_back(AabbBuffer);
 
-	GeometryInstance gi = context->createGeometryInstance();
+	GeometryInstance gi = crtContext->createGeometryInstance();
 	gi->setGeometry(sphere);
 	return gi;
 }
 
+void createPrePassContext()
+{
+	prepass_context = Context::create();
+	prepass_context->setRayTypeCount( 2 );
+	prepass_context->setEntryPointCount( 1 );
+	prepass_context->setStackSize( 1800 );
+
+	prepass_context[ "scene_epsilon"                  ]->setFloat( 1.e-3f );
+	prepass_context[ "pathtrace_ray_type"             ]->setUint( 0u );
+	prepass_context[ "pathtrace_shadow_ray_type"      ]->setUint( 1u );
+	prepass_context[ "rr_begin_depth"                 ]->setUint( rr_begin_depth );
+
+	Buffer buffer = sutil::createOutputBuffer( prepass_context, RT_FORMAT_FLOAT4, width, height, use_pbo );
+	prepass_context["output_buffer"]->set( buffer );
+
+	// Setup programs
+	const std::string cuda_file = "photonPrePass.cu";
+	const std::string ptx_path = ptxPath( cuda_file );
+	prepass_context->setRayGenerationProgram( 0, prepass_context->createProgramFromPTXFile( ptx_path, "pathtrace_camera" ) );
+	prepass_context->setExceptionProgram( 0, prepass_context->createProgramFromPTXFile( ptx_path, "exception" ) );
+	prepass_context->setMissProgram( 0, prepass_context->createProgramFromPTXFile( ptx_path, "miss" ) );
+
+	prepass_context[ "sqrt_num_samples" ]->setUint( sqrt_num_samples );
+	prepass_context[ "bad_color"        ]->setFloat( 1000000.0f, 0.0f, 1000000.0f ); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
+	prepass_context[ "bg_color"         ]->setFloat( make_float3(0.0f) );
+}
 
 void createContext()
 {
@@ -316,31 +358,36 @@ void loadGeometry()
     // Floor
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
                                         make_float3( 0.0f, 0.0f, 559.2f ),
-                                        make_float3( 556.0f, 0.0f, 0.0f ) ) );
+                                        make_float3( 556.0f, 0.0f, 0.0f ),
+										context) );
     setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Ceiling
     gis.push_back( createParallelogram( make_float3( 0.0f, 548.8f, 0.0f ),
                                         make_float3( 556.0f, 0.0f, 0.0f ),
-                                        make_float3( 0.0f, 0.0f, 559.2f ) ) );
+										make_float3( 0.0f, 0.0f, 559.2f ),
+										context ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Back wall
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 559.2f),
                                         make_float3( 0.0f, 548.8f, 0.0f),
-                                        make_float3( 556.0f, 0.0f, 0.0f) ) );
+										make_float3( 556.0f, 0.0f, 0.0f),
+										context ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Right wall
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
                                         make_float3( 0.0f, 548.8f, 0.0f ),
-                                        make_float3( 0.0f, 0.0f, 559.2f ) ) );
+										make_float3( 0.0f, 0.0f, 559.2f ),
+										context ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", green);
 
     // Left wall
     gis.push_back( createParallelogram( make_float3( 556.0f, 0.0f, 0.0f ),
                                         make_float3( 0.0f, 0.0f, 559.2f ),
-                                        make_float3( 0.0f, 548.8f, 0.0f ) ) );
+										make_float3( 0.0f, 548.8f, 0.0f ),
+										context ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", red);
 
     // Short block
@@ -408,7 +455,8 @@ void loadGeometry()
 	//	make_float3( 158.0f, 0.0f, -49.0f) ) );
 	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
     // Create shadow group (no light)
-	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f));
+	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
+		context));
 	setMaterial(gis.back(), specular, "diffuse_color", blue);
 
     GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
@@ -418,7 +466,8 @@ void loadGeometry()
     // Light
     gis.push_back( createParallelogram( make_float3( 343.0f, 548.6f, 227.0f),
                                         make_float3( -130.0f, 0.0f, 0.0f),
-                                        make_float3( 0.0f, 0.0f, 105.0f) ) );
+                                        make_float3( 0.0f, 0.0f, 105.0f),
+										context) );
     setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
 
     // Create geometry group
@@ -427,7 +476,119 @@ void loadGeometry()
     context["top_object"]->set( geometry_group );
 }
 
-  
+void loadPrePassGeometry()
+{
+	// Light buffer
+	ParallelogramLight light;
+	light.corner   = make_float3( 343.0f, 548.6f, 227.0f);
+	light.v1       = make_float3( -130.0f, 0.0f, 0.0f);
+	light.v2       = make_float3( 0.0f, 0.0f, 105.0f);
+	light.normal   = normalize( cross(light.v1, light.v2) );
+	light.emission = make_float3( 15.0f, 15.0f, 5.0f );
+
+	Buffer light_buffer = prepass_context->createBuffer( RT_BUFFER_INPUT );
+	light_buffer->setFormat( RT_FORMAT_USER );
+	light_buffer->setElementSize( sizeof( ParallelogramLight ) );
+	light_buffer->setSize( 1u );
+	memcpy( light_buffer->map(), &light, sizeof( light ) );
+	light_buffer->unmap();
+	prepass_context["lights"]->setBuffer( light_buffer );
+
+	// Set up material
+	const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
+	std::string ptx_path = ptxPath( cuda_file );
+	Material diffuse = prepass_context->createMaterial();
+	Program diffuse_ch = prepass_context->createProgramFromPTXFile( ptx_path, "diffuse" );
+	Program diffuse_ah = prepass_context->createProgramFromPTXFile( ptx_path, "shadow" );
+	diffuse->setClosestHitProgram( 0, diffuse_ch );
+	diffuse->setAnyHitProgram( 1, diffuse_ah );
+
+	Material specular = prepass_context->createMaterial();
+	Program specular_ch = prepass_context->createProgramFromPTXFile(ptx_path, "specular");
+	Program specular_ah = prepass_context->createProgramFromPTXFile(ptx_path, "shadow");
+	specular->setClosestHitProgram(0, specular_ch);
+	specular->setAnyHitProgram(1, specular_ah);
+
+	Material diffuse_light = prepass_context->createMaterial();
+	Program diffuse_em = prepass_context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
+	diffuse_light->setClosestHitProgram( 0, diffuse_em );
+
+	// Set up parallelogram programs
+	ptx_path = ptxPath( "parallelogram.cu" );
+	pgram_bounding_box = prepass_context->createProgramFromPTXFile( ptx_path, "bounds" );
+	pgram_intersection = prepass_context->createProgramFromPTXFile( ptx_path, "intersect" );
+
+	ptx_path = ptxPath("sphere.cu");
+	sphere_bounding_box = prepass_context->createProgramFromPTXFile(ptx_path, "bounds");
+	sphere_intersection = prepass_context->createProgramFromPTXFile(ptx_path, "intersect");
+
+	// create geometry instances
+	std::vector<GeometryInstance> gis;
+
+	const float3 white = make_float3( 0.8f, 0.8f, 0.8f );
+	const float3 green = make_float3( 0.05f, 0.8f, 0.05f );
+	const float3 red   = make_float3( 0.8f, 0.05f, 0.05f );
+	const float3 light_em = make_float3( 15.0f, 15.0f, 5.0f );
+	const float3 gray = make_float3(0.5f, 0.5f, 0.5f);
+	const float3 blue = make_float3(0.05f, 0.05f, 0.8f);
+
+	// Floor
+	gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
+		make_float3( 0.0f, 0.0f, 559.2f ),
+		make_float3( 556.0f, 0.0f, 0.0f ),
+		prepass_context ) );
+	setMaterial(gis.back(), diffuse, "diffuse_color", gray);
+
+	// Ceiling
+	gis.push_back( createParallelogram( make_float3( 0.0f, 548.8f, 0.0f ),
+		make_float3( 556.0f, 0.0f, 0.0f ),
+		make_float3( 0.0f, 0.0f, 559.2f ),
+		prepass_context ) );
+	setMaterial(gis.back(), diffuse, "diffuse_color", gray);
+
+	// Back wall
+	gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 559.2f),
+		make_float3( 0.0f, 548.8f, 0.0f),
+		make_float3( 556.0f, 0.0f, 0.0f),
+		prepass_context ) );
+	setMaterial(gis.back(), diffuse, "diffuse_color", gray);
+
+	// Right wall
+	gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
+		make_float3( 0.0f, 548.8f, 0.0f ),
+		make_float3( 0.0f, 0.0f, 559.2f ),
+		prepass_context ) );
+	setMaterial(gis.back(), diffuse, "diffuse_color", green);
+
+	// Left wall
+	gis.push_back( createParallelogram( make_float3( 556.0f, 0.0f, 0.0f ),
+		make_float3( 0.0f, 0.0f, 559.2f ),
+		make_float3( 0.0f, 548.8f, 0.0f ),
+		prepass_context ) );
+	setMaterial(gis.back(), diffuse, "diffuse_color", red);
+
+	// Create shadow group (no light)
+	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
+		prepass_context));
+	setMaterial(gis.back(), specular, "diffuse_color", blue);
+
+	GeometryGroup shadow_group = prepass_context->createGeometryGroup(gis.begin(), gis.end());
+	shadow_group->setAcceleration( prepass_context->createAcceleration( "Trbvh" ) );
+	prepass_context["top_shadower"]->set( shadow_group );
+
+	// Light
+	gis.push_back( createParallelogram( make_float3( 343.0f, 548.6f, 227.0f),
+		make_float3( -130.0f, 0.0f, 0.0f),
+		make_float3( 0.0f, 0.0f, 105.0f),
+		prepass_context) );
+	setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
+
+	// Create geometry group
+	GeometryGroup geometry_group = prepass_context->createGeometryGroup(gis.begin(), gis.end());
+	geometry_group->setAcceleration( prepass_context->createAcceleration( "Trbvh" ) );
+	prepass_context["top_object"]->set( geometry_group );
+}
+
 void setupCamera()
 {
     camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
@@ -437,6 +598,14 @@ void setupCamera()
     camera_rotate  = Matrix4x4::identity();
 }
 
+void setupPrePassCamera()
+{
+	prepass_camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
+	prepass_camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
+	prepass_camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
+
+	prepass_camera_rotate = Matrix4x4::identity();
+}
 
 void updateCamera()
 {
@@ -473,23 +642,62 @@ void updateCamera()
     context[ "V"  ]->setFloat( camera_v );
     context[ "W"  ]->setFloat( camera_w );
 
-	float3 F = normalize(camera_lookat - camera_eye);
-	float3 R = normalize( cross( F, camera_up ) );
-	float3 U = normalize( cross( R, F ) );
+	//float3 F = normalize(camera_lookat - camera_eye);
+	//float3 R = normalize( cross( F, camera_up ) );
+	//float3 U = normalize( cross( R, F ) );
 
-	glm::mat4x4 projectionMatrix = glm::perspective(fov, aspect_ratio, 0.01f, 1000.f);
-	glm::mat4x4 viewMatrix = glm::mat4x4(R.x, U.x, F.x, 0.0f,
-										 R.y, U.y, F.y, 0.0f,
-										 R.z, U.z, F.z, 0.0f,
-										 -camera_eye.x, -camera_eye.y, -camera_eye.z, 1.0f);
-	mvp = projectionMatrix * viewMatrix;
+	//glm::mat4x4 projectionMatrix = glm::perspective(fov, aspect_ratio, 0.01f, 1000.f);
+	//glm::mat4x4 viewMatrix = glm::mat4x4(R.x, U.x, F.x, 0.0f,
+	//									 R.y, U.y, F.y, 0.0f,
+	//									 R.z, U.z, F.z, 0.0f,
+	//									 -camera_eye.x, -camera_eye.y, -camera_eye.z, 1.0f);
+	//mvp = projectionMatrix * viewMatrix;
 
     if( camera_changed ) // reset accumulation
         frame_number = 1;
     camera_changed = false;
 }
 
+void updatePrePassCamera()
+{
+	const float fov  = 35.0f;
+	const float aspect_ratio = static_cast<float>(width) / static_cast<float>(height);
 
+	float3 camera_u, camera_v, camera_w;
+	sutil::calculateCameraVariables(
+		prepass_camera_eye, prepass_camera_lookat, prepass_camera_up, fov, aspect_ratio,
+		camera_u, camera_v, camera_w, /*fov_is_vertical*/ true );
+
+	const Matrix4x4 frame = Matrix4x4::fromBasis( 
+		normalize( camera_u ),
+		normalize( camera_v ),
+		normalize( -camera_w ),
+		prepass_camera_lookat);
+	const Matrix4x4 frame_inv = frame.inverse();
+	// Apply camera rotation twice to match old SDK behavior
+	const Matrix4x4 trans     = frame*prepass_camera_rotate*prepass_camera_rotate*frame_inv; 
+
+	prepass_camera_eye    = make_float3( trans*make_float4( prepass_camera_eye,    1.0f ) );
+	prepass_camera_lookat = make_float3( trans*make_float4( prepass_camera_lookat, 1.0f ) );
+	prepass_camera_up     = make_float3( trans*make_float4( prepass_camera_up,     0.0f ) );
+
+	sutil::calculateCameraVariables(
+		prepass_camera_eye, prepass_camera_lookat, prepass_camera_up, fov, aspect_ratio,
+		camera_u, camera_v, camera_w, true );
+
+	prepass_camera_rotate = Matrix4x4::identity();
+
+	prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
+	prepass_context[ "eye"]->setFloat( prepass_camera_eye );
+	prepass_context[ "U"  ]->setFloat( camera_u );
+	prepass_context[ "V"  ]->setFloat( camera_v );
+	prepass_context[ "W"  ]->setFloat( camera_w );
+
+	if( prepass_camera_changed ) // reset accumulation
+		prepass_frame_number = 1;
+	prepass_camera_changed = false;
+
+}
 void glutInitialize( int* argc, char** argv )
 {
     glutInit( argc, argv );
@@ -529,6 +737,33 @@ void glutRun()
     glutMainLoop();
 }
 
+void glutPrePassRun()
+{
+	// Initialize GL state                                                            
+	glMatrixMode(GL_PROJECTION);                                                   
+	glLoadIdentity();                                                              
+	glOrtho(0, 1, 0, 1, -1, 1 );                                                   
+
+	glMatrixMode(GL_MODELVIEW);                                                    
+	glLoadIdentity();                                                              
+
+	glViewport(0, 0, width, height);                                 
+
+	glutShowWindow();                                                              
+	glutReshapeWindow( width, height);
+
+	// register glut callbacks
+	glutDisplayFunc( glutPrePassDisplay );
+	glutIdleFunc( glutPrePassDisplay );
+	glutReshapeFunc( glutResize );
+	//glutKeyboardFunc( glutKeyboardPress );
+	//glutMouseFunc( glutMousePress );
+	//glutMotionFunc( glutMouseMotion );
+
+	registerExitHandler();
+
+	glutMainLoop();
+}
 
 //------------------------------------------------------------------------------
 //
@@ -621,6 +856,17 @@ void glutDisplay()
 	
 }
 
+void glutPrePassDisplay()
+{
+	updatePrePassCamera();
+	prepass_context->launch(0, width, height);
+
+	sutil::displayBufferGL( prepass_context["output_buffer"]->getBuffer() );
+	static unsigned prepass_frame_count = 0;
+	sutil::displayFps(prepass_frame_count++);
+
+	glutSwapBuffers();
+}
 
 void glutKeyboardPress( unsigned char k, int x, int y )
 {
@@ -779,23 +1025,29 @@ int main( int argc, char** argv )
         glewInit();
 #endif
 
-        createContext();
-        setupCamera();
-        loadGeometry();
+		createPrePassContext();
+		setupPrePassCamera();
+		loadPrePassGeometry();
+		prepass_context->validate();
+		glutPrePassRun();
 
-        context->validate();
+        //createContext();
+        //setupCamera();
+        //loadGeometry();
 
-        if ( out_file.empty() )
-        {
-            glutRun();
-        }
-        else
-        {
-            updateCamera();
-            context->launch( 0, width, height );
-            sutil::displayBufferPPM( out_file.c_str(), getOutputBuffer() );
-            destroyContext();
-        }
+        //context->validate();
+
+        //if ( out_file.empty() )
+        //{
+        //    glutRun();
+        //}
+        //else
+        //{
+        //    updateCamera();
+        //    context->launch( 0, width, height );
+        //    sutil::displayBufferPPM( out_file.c_str(), getOutputBuffer() );
+        //    destroyContext();
+        //}
 		
         return 0;
     }
