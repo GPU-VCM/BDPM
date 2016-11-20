@@ -106,6 +106,7 @@ std::vector<Buffer> vAabbBuffer;
 Context	prepass_context = 0;
 float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
+int photonSamples = 800; // number of samples in 360 degrees
 
 //------------------------------------------------------------------------------
 //
@@ -257,11 +258,11 @@ void createPrePassContext()
 	prepass_context[ "pathtrace_shadow_ray_type"      ]->setUint( 1u );
 	prepass_context[ "rr_begin_depth"                 ]->setUint( rr_begin_depth );
 
-	Buffer buffer = sutil::createOutputBuffer( prepass_context, RT_FORMAT_FLOAT4, width, height, use_pbo );
+	Buffer buffer = sutil::createOutputBuffer( prepass_context, RT_FORMAT_FLOAT4, photonSamples, photonSamples, use_pbo );
 	prepass_context["output_buffer"]->set( buffer );
-	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2 * width * height);
+	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2 * photonSamples * photonSamples);
 	prepass_context["photonBuffer"]->set(photonBuffer);
-	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, width * height);
+	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, photonSamples * photonSamples);
 	prepass_context["isHitBuffer"]->set(isHitBuffer);
 
 	// Setup programs
@@ -640,7 +641,7 @@ void setupCamera()
 void setupPrePassCamera()
 {
 	prepass_camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
-	prepass_camera_eye    = make_float3( 343.0f, 538.6f, 227.0f );
+	prepass_camera_eye    = make_float3( 343.0f, 548.6f, 227.0f );
 	prepass_camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
 	prepass_camera_lookat = make_float3( 278.0f, 0.0f,    250.0f );
 	prepass_camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
@@ -964,7 +965,7 @@ void drawPrePassPhoton()
 	Photon *photon = (Photon*)data;
 
 	//int i = 0;
-	for (int i = 0; i < width * height; i++)
+	for (int i = 0; i < photonSamples * photonSamples; i++)
 	{
 		if (isHit[i])
 		{
@@ -1009,7 +1010,7 @@ void drawPhoton()
 	Photon *photon = (Photon*)data;
 
 	//int i = 0;
-	for (int i = 0; i < width * height; i++)
+	for (int i = 0; i < photonSamples * photonSamples; i++)
 	{
 		if (isHit[i])
 		{
@@ -1276,11 +1277,11 @@ int main( int argc, char** argv )
 		prepass_context->validate();
 		//glutPrePassRun();
 		updatePrePassCamera();
-		int nPrePassIteration = 50;
+		int nPrePassIteration = 2000;
 		while (nPrePassIteration--)
 		{
 			prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
-			prepass_context->launch(0, width, height);
+			prepass_context->launch(0, photonSamples, photonSamples);
 		}
 
         createContext();

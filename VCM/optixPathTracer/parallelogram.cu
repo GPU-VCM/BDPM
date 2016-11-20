@@ -101,3 +101,8 @@ RT_PROGRAM void bounds (int primIdx, float result[6])
   
 }
 
+	//float r = sqrt(1.0f - u1u2.x * u1u2.x);
+	//float phi = 2 * M_PI * u1u2.y;
+	//float theta = M_PI * u1u2.x;
+	//float3 dir = make_float3(cos(phi), cos(theta), sin(phi));
+	//printf("%f %f %f\n", dir.x, dir.y, dir.z);

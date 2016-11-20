@@ -90,87 +90,79 @@ RT_PROGRAM void pathtrace_camera()
 {
     size_t2 screen = output_buffer.size();
 
-    float2 inv_screen = 1.0f/make_float2(screen) * 2.f;
-    float2 pixel = (make_float2(launch_index)) * inv_screen - 1.f;
+    float2 u1u2 = make_float2(launch_index) / make_float2(screen);
 
-    float2 jitter_scale = inv_screen / sqrt_num_samples;
-    unsigned int samples_per_pixel = sqrt_num_samples*sqrt_num_samples;
     float3 result = make_float3(0.0f);
-
-    unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
-
 	int index = screen.x*launch_index.y+launch_index.x;
-	//int counter=0;
-    //do 
-    //{
-		
-        //
-        // Sample pixel using jittering
-        //
-        //unsigned int x = samples_per_pixel%sqrt_num_samples;
-       //unsigned int y = samples_per_pixel/sqrt_num_samples;
-		//if (launch_index.x==1 && launch_index.y==1)
-		//	printf("sample:%d\n",counter++);
-        //float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
-        float2 d = pixel;// + jitter*jitter_scale;
-        float3 ray_origin = eye;
-        float3 ray_direction = normalize(d.x*U + d.y*V + W);
-		
-		float3 firstRay_direction = ray_direction;
-		bool firstIntersection = false;
-		float t;
-        // Initialze per-ray data
-        PerRayData_pathtrace prd;
-        prd.result = make_float3(0.f);
-        prd.attenuation = make_float3(1.f);
-        prd.countEmitted = true;
-        prd.done = false;
-        prd.seed = seed;
-        prd.depth = 0;
-		
-        // Each iteration is a segment of the ray path.  The closest hit will
-        // return new segments to be traced here.
-        for(;;)
+
+	//float r = sqrt(1.0f - u1u2.x * u1u2.x);
+	//float phi = 2 * M_PI *u1u2.y;
+	//float3 dir = make_float3(cos(phi) * r, -u1u2.x, sin(phi) * r);
+	//printf("%f %f %f\n", dir.x, dir.y, dir.z);
+	//float r = sqrt(1.0f - u1u2.x * u1u2.x);
+	float phi = 2 * M_PI * u1u2.y;
+	float theta = M_PI * u1u2.x;
+	float r = sin(theta);
+	float3 dir = make_float3(r * cos(phi), cos(theta), r * sin(phi));
+	//printf("%f %f %f\n", dir.x, dir.y, dir.z);
+    float3 ray_origin = eye;
+    float3 ray_direction = dir;
+	unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
+
+	float3 firstRay_direction = ray_direction;
+	bool firstIntersection = false;
+	float t;
+    // Initialze per-ray data
+    PerRayData_pathtrace prd;
+    prd.result = make_float3(0.f);
+    prd.attenuation = make_float3(1.f);
+    prd.countEmitted = true;
+    prd.done = false;
+	prd.seed = seed;
+    prd.depth = 0;
+
+	
+    // Each iteration is a segment of the ray path.  The closest hit will
+    // return new segments to be traced here.
+    for(;;)
+    {
+        Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+        rtTrace(top_object, ray, prd);
+
+        if(prd.done)
         {
-            Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
-            rtTrace(top_object, ray, prd);
-
-            if(prd.done)
-            {
-                // We have hit the background or a luminaire
-                prd.result += prd.radiance * prd.attenuation;
-                break;
-            }
-			if (!firstIntersection)
-			{
-				firstIntersection = true;
-				t = prd.tValue;
-			}
-            // Russian roulette termination 
-            if(prd.depth >= rr_begin_depth)
-            {
-                float pcont = fmaxf(prd.attenuation);
-                if(rnd(prd.seed) >= pcont)
-                    break;
-                prd.attenuation /= pcont;
-            }
-
-            prd.depth++;
+            // We have hit the background or a luminaire
             prd.result += prd.radiance * prd.attenuation;
-
-            // Update ray data for the next path segment
-            ray_origin = prd.origin;
-            ray_direction = prd.direction;
+            break;
+        }
+		if (!firstIntersection)
+		{
+			firstIntersection = true;
+			t = prd.tValue;
+		}
+        // Russian roulette termination 
+        if(prd.depth >= rr_begin_depth)
+        {
+            float pcont = fmaxf(prd.attenuation);
+            if(rnd(prd.seed) >= pcont)
+                break;
+            prd.attenuation /= pcont;
         }
 
-        result += prd.result;
-        seed = prd.seed;
-    //} while (--samples_per_pixel);
+        prd.depth++;
+        prd.result += prd.radiance * prd.attenuation;
 
+        // Update ray data for the next path segment
+        ray_origin = prd.origin;
+        ray_direction = prd.direction;
+    }
+
+    result += prd.result;
+	seed = prd.seed;
     //
     // Update the output buffer
     //
-    float3 pixel_color = result/(sqrt_num_samples*sqrt_num_samples);
+    float3 pixel_color = result;
 	
 
     if (frame_number > 1)
