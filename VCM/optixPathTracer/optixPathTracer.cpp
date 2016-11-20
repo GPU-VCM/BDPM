@@ -419,31 +419,31 @@ void loadGeometry()
     //setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
     // Tall block
-    gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
-                                        make_float3( -158.0f, 0.0f, 49.0f),
-                                        make_float3( 49.0f, 0.0f, 159.0f),
-										context) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-										make_float3( 49.0f, 0.0f, 159.0f),
-										context ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-										make_float3( -158.0f, 0.0f, 50.0f),
-										context ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-										make_float3( -49.0f, 0.0f, -160.0f),
-										context ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
-                                        make_float3( 0.0f, 330.0f, 0.0f),
-										make_float3( 158.0f, 0.0f, -49.0f),
-										context ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
+    //                                    make_float3( -158.0f, 0.0f, 49.0f),
+    //                                    make_float3( 49.0f, 0.0f, 159.0f),
+				//						context) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
+    //                                    make_float3( 0.0f, 330.0f, 0.0f),
+				//						make_float3( 49.0f, 0.0f, 159.0f),
+				//						context ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
+    //                                    make_float3( 0.0f, 330.0f, 0.0f),
+				//						make_float3( -158.0f, 0.0f, 50.0f),
+				//						context ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
+    //                                    make_float3( 0.0f, 330.0f, 0.0f),
+				//						make_float3( -49.0f, 0.0f, -160.0f),
+				//						context ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
+    //gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
+    //                                    make_float3( 0.0f, 330.0f, 0.0f),
+				//						make_float3( 158.0f, 0.0f, -49.0f),
+				//						context ) );
+    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
 	//gis.push_back( createSphere( make_float3( 423.0f, 330.0f, 247.0f),
 	//	make_float3( -158.0f, 0.0f, 49.0f),
@@ -466,9 +466,9 @@ void loadGeometry()
 	//	make_float3( 158.0f, 0.0f, -49.0f) ) );
 	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
     // Create shadow group (no light)
-	//gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
-	//	context));
-	//setMaterial(gis.back(), specular, "diffuse_color", blue);
+	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
+		context));
+	setMaterial(gis.back(), specular, "diffuse_color", blue);
 
     GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
     shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
@@ -580,35 +580,35 @@ void loadPrePassGeometry()
 
 
 	// Tall block
-	gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
-		make_float3( -158.0f, 0.0f, 49.0f),
-		make_float3( 49.0f, 0.0f, 159.0f),
-		prepass_context	) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
-		make_float3( 0.0f, 330.0f, 0.0f),
-		make_float3( 49.0f, 0.0f, 159.0f),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
-		make_float3( 0.0f, 330.0f, 0.0f),
-		make_float3( -158.0f, 0.0f, 50.0f),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
-		make_float3( 0.0f, 330.0f, 0.0f),
-		make_float3( -49.0f, 0.0f, -160.0f),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
-		make_float3( 0.0f, 330.0f, 0.0f),
-		make_float3( 158.0f, 0.0f, -49.0f),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
+	//	make_float3( -158.0f, 0.0f, 49.0f),
+	//	make_float3( 49.0f, 0.0f, 159.0f),
+	//	prepass_context	) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
+	//	make_float3( 0.0f, 330.0f, 0.0f),
+	//	make_float3( 49.0f, 0.0f, 159.0f),
+	//	prepass_context ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
+	//	make_float3( 0.0f, 330.0f, 0.0f),
+	//	make_float3( -158.0f, 0.0f, 50.0f),
+	//	prepass_context ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
+	//	make_float3( 0.0f, 330.0f, 0.0f),
+	//	make_float3( -49.0f, 0.0f, -160.0f),
+	//	prepass_context ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
+	//	make_float3( 0.0f, 330.0f, 0.0f),
+	//	make_float3( 158.0f, 0.0f, -49.0f),
+	//	prepass_context ) );
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
-	//gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
-	//	prepass_context));
-	//setMaterial(gis.back(), specular, "diffuse_color", blue);
+	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
+		prepass_context));
+	setMaterial(gis.back(), specular, "diffuse_color", blue);
 
 	GeometryGroup shadow_group = prepass_context->createGeometryGroup(gis.begin(), gis.end());
 	shadow_group->setAcceleration( prepass_context->createAcceleration( "Trbvh" ) );
@@ -999,6 +999,7 @@ void drawPhoton()
 	glPointSize(3.0f);
 	glEnable(GL_FRAMEBUFFER_SRGB_EXT);
 	glEnable(GL_POINT_SMOOTH);
+	glEnable(GL_DEPTH_TEST);
 	glBegin(GL_POINTS);
 
 	GLvoid* data = 0;
@@ -1013,7 +1014,7 @@ void drawPhoton()
 		if (isHit[i])
 		{
 			glColor4f(photon[i].color.x, photon[i].color.y, photon[i].color.z, 1.0f);
-			glVertex3f(photon[i].position.x, photon[i].position.y, photon[i].position.z);
+			glVertex4f(photon[i].position.x, photon[i].position.y, photon[i].position.z, 1.0f);
 			//glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 			//printf("%d %f %f %f\n", i, photon[i].position.x, photon[i].position.y, photon[i].position.z);		
 		}
@@ -1026,12 +1027,14 @@ void drawPhoton()
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
 	glEnd();
+	glDisable(GL_DEPTH_TEST);
 }
 
 void glutDisplay()
 {
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	glClear(GL_COLOR_BUFFER_BIT);
+	glClearDepth(1.0);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//testGetBuffer();
     updateCamera();
     context->launch( 0, width, height );
@@ -1043,7 +1046,7 @@ void glutDisplay()
 	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     {
       static unsigned frame_count = 0;
-      sutil::displayFps( frame_count++ );
+      //sutil::displayFps( frame_count++ );
     }
 
     glutSwapBuffers();
@@ -1110,7 +1113,8 @@ void glutMouseMotion( int x, int y)
                          static_cast<float>( height );
         const float dmax = fabsf( dx ) > fabs( dy ) ? dx : dy;
         const float scale = std::min<float>( dmax, 0.9f );
-        camera_eye = camera_eye + (camera_lookat - camera_eye)*scale;
+        //camera_eye = camera_eye + (camera_lookat - camera_eye)*scale;
+		camera_eye = camera_eye + normalize(camera_lookat - camera_eye) * 300.f *scale;
         camera_changed = true;
     }
     else if( mouse_button == GLUT_LEFT_BUTTON )
@@ -1138,8 +1142,8 @@ void glutMouseMotion( int x, int y)
 		float3 R = normalize( cross( F, camera_up ) );
 		float3 U = normalize( cross( R, F ) );
 
-		camera_lookat += (U * dy + R * dx) * 1000.0f;
-		camera_eye += (U * dy + R * dx) * 1000.0f;
+		camera_lookat += (-U * dy + R * dx) * 1000.0f;
+		camera_eye += (-U * dy + R * dx) * 1000.0f;
 		camera_changed = true;
 	}
 
@@ -1275,7 +1279,7 @@ int main( int argc, char** argv )
 		int nPrePassIteration = 50;
 		while (nPrePassIteration--)
 		{
-			//prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
+			prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
 			prepass_context->launch(0, width, height);
 		}
 

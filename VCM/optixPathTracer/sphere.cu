@@ -9,6 +9,7 @@ rtDeclareVariable(float, radius, , );
 rtDeclareVariable(float3, world_normal, attribute world_normal, ); 
 //rtDeclareVariable(int, lgt_idx, attribute lgt_idx, ); 
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
+rtDeclareVariable(float, tValue, attribute tValue, );
 rtBuffer<float3, 1>              Aabb_buffer;
 
 RT_PROGRAM void intersect(int primIdx)
@@ -21,11 +22,13 @@ RT_PROGRAM void intersect(int primIdx)
 	{
 		
 		float t = fminf(-dv + sqrt(temp), -dv - sqrt(temp));
-		if( rtPotentialIntersection(t)) 
+		//float3 end = ray.origin + t * ray.direction;(length(end - center) - radius)<0.01f &&
+		if(rtPotentialIntersection(t)) 
 		{
 			float3 p = ray.origin + t * ray.direction;
 			//printf("Intersected:%f %f %f\n", p.x, p.y, p.z);
 			world_normal = normalize(ray.origin + t * ray.direction - center);
+			tValue = t;
 			rtReportIntersection( 0 );
         }
 	}
