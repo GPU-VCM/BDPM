@@ -501,7 +501,7 @@ void loadPrePassGeometry()
 	prepass_context["lights"]->setBuffer( light_buffer );
 
 	// Set up material
-	const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
+	const std::string cuda_file = "photonPrePass.cu";
 	std::string ptx_path = ptxPath( cuda_file );
 	Material diffuse = prepass_context->createMaterial();
 	Program diffuse_ch = prepass_context->createProgramFromPTXFile( ptx_path, "diffuse" );
@@ -608,7 +608,7 @@ void setupCamera()
 void setupPrePassCamera()
 {
 	prepass_camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
-	prepass_camera_eye    = make_float3( 343.0f, 548.6f, 227.0f );
+	prepass_camera_eye    = make_float3( 343.0f, 538.6f, 227.0f );
 	prepass_camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
 	prepass_camera_lookat = make_float3( 278.0f, 0.0f,    250.0f );
 	prepass_camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
@@ -925,13 +925,57 @@ void glutDisplay()
 	
 }
 
+void drawPhoton()
+{
+	glMatrixMode (GL_PROJECTION);  
+	glLoadIdentity ();  
+	gluPerspective(150.0, (GLfloat) width/(GLfloat) height, 0.01, 20000.0);  
+	glMatrixMode(GL_MODELVIEW);  
+	glLoadIdentity();  
+	gluLookAt(prepass_camera_eye.x, prepass_camera_eye.y, prepass_camera_eye.z,
+		prepass_camera_lookat.x, prepass_camera_lookat.y, prepass_camera_lookat.z,
+		prepass_camera_up.x, prepass_camera_up.y, prepass_camera_up.z);
+
+	//glColor3f(0.0f, 0.0f, 1.0f);
+
+	glPointSize(5.0f);
+	glEnable(GL_FRAMEBUFFER_SRGB_EXT);
+	glBegin(GL_POINTS);
+
+	GLvoid* data = 0;
+	RT_CHECK_ERROR(rtBufferMap(prepass_context["isHitBuffer"]->getBuffer()->get(), &data));
+	int *isHit = (int*)data;
+	RT_CHECK_ERROR(rtBufferMap(prepass_context["photonBuffer"]->getBuffer()->get(), &data));
+	Photon *photon = (Photon*)data;
+
+	//int i = 0;
+	for (int i = 0; i < width * height; i++)
+	{
+		if (isHit[i])
+		{
+			glColor4f(photon[i].color.x, photon[i].color.y, photon[i].color.z, 1.0f);
+			glVertex3f(photon[i].position.x, photon[i].position.y, photon[i].position.z);
+			//printf("%d %f %f %f\n", i, photon[i].position.x, photon[i].position.y, photon[i].position.z);		
+		}
+		else
+		{
+
+		}
+	}
+
+	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
+	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
+	glEnd();
+}
+
 void glutPrePassDisplay()
 {
 	updatePrePassCamera();
 	prepass_context->launch(0, width, height);
 	
-	sutil::displayBufferGL( prepass_context["output_buffer"]->getBuffer() );
-	drawPrePassBoundingBox();
+	//sutil::displayBufferGL( prepass_context["output_buffer"]->getBuffer() );
+	//drawPrePassBoundingBox();
+	drawPhoton();
 	static unsigned prepass_frame_count = 0;
 	sutil::displayFps(prepass_frame_count++);
 

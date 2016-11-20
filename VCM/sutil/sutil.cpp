@@ -486,7 +486,10 @@ void sutil::displayBufferGL( optix::Buffer buffer )
     {
         glGetBooleanv( GL_FRAMEBUFFER_SRGB_CAPABLE_EXT, &use_SRGB );
         if( use_SRGB )
+		{
             glEnable(GL_FRAMEBUFFER_SRGB_EXT);
+			//printf("SRGB\n");
+		}
     }
 
     // Check if we have a GL interop display buffer
@@ -512,7 +515,7 @@ void sutil::displayBufferGL( optix::Buffer buffer )
 
         // send PBO to texture
         glBindBuffer( GL_PIXEL_UNPACK_BUFFER, pboId );
-
+		
         RTsize elmt_size = buffer->getElementSize();
         if      ( elmt_size % 8 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 8);
         else if ( elmt_size % 4 == 0) glPixelStorei(GL_UNPACK_ALIGNMENT, 4);

@@ -115,7 +115,7 @@ RT_PROGRAM void pathtrace_camera()
         float2 d = pixel;// + jitter*jitter_scale;
         float3 ray_origin = eye;
         float3 ray_direction = normalize(d.x*U + d.y*V + W);
-
+		
 		float3 firstRay_direction = ray_direction;
 		bool firstIntersection = false;
 		float t;
@@ -178,20 +178,24 @@ RT_PROGRAM void pathtrace_camera()
         float a = 1.0f / (float)frame_number;
         float3 old_color = make_float3(output_buffer[launch_index]);
         output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
+		//output_buffer[launch_index] = make_float4(0.5f, 0.0f, 0.0f, 1.0f);
+		//photonBuffer[index * 2 + 1] = lerp( old_color, pixel_color, a );
+		//printf("IN\n");
     }
     else
     {
         output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
+		//photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]);
     }
 
 	if (firstIntersection)
 		isHitBuffer[index] = 1;
 	else
 		isHitBuffer[index] = 0;
-
+	//printf("%f %f %f %f\n", t, firstRay_direction.x, firstRay_direction.y, firstRay_direction.z);
 	photonBuffer[index * 2] = eye + t * firstRay_direction; // photon world position
 	photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]); // photon color
-
+	//photonBuffer[index * 2 + 1] = make_float3(0.5f, 0.0f, 0.0f);
 	//printf("%f %f %f\n", pixel_color.x, pixel_color.y, pixel_color.z);
 	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
 }
@@ -227,6 +231,7 @@ rtDeclareVariable(float, tValue, attribute tValue, );
 
 RT_PROGRAM void diffuse()
 {
+	//printf("sasd\n");
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
 	//printf("%f %f %f %f %f %f\n", world_shading_normal.x, world_shading_normal.y, world_shading_normal.z,
 	//	shading_normal.x, shading_normal.y, shading_normal.z);
@@ -294,6 +299,7 @@ RT_PROGRAM void diffuse()
 
     current_prd.radiance = result;
 	current_prd.tValue = tValue;
+	
 	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 

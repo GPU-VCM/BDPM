@@ -62,6 +62,7 @@ RT_PROGRAM void intersect(int primIdx)
           shading_normal = geometric_normal = n;
           texcoord = make_float3(a1,a2,0);
 		  tValue = t;
+		  
           //lgt_idx = lgt_instance;
           rtReportIntersection( 0 );
         }
