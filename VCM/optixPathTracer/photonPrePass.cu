@@ -46,6 +46,7 @@ struct PerRayData_pathtrace
     int done;
 
 	float tValue;
+	int isSpecular;
 };
 
 struct PerRayData_pathtrace_shadow
@@ -89,8 +90,14 @@ rtBuffer<int>	isHitBuffer;
 RT_PROGRAM void pathtrace_camera()
 {
     size_t2 screen = output_buffer.size();
-
-    float2 u1u2 = make_float2(launch_index) / make_float2(screen);
+	int offset = frame_number * screen.x * screen.y * 5;
+	//printf("%d\n", offset);
+	unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
+    //float2 u1u2 = make_float2(launch_index) / make_float2(screen);
+	float2 u1u2;
+	u1u2.x = rnd(seed);
+	u1u2.y = rnd(seed);
+	//printf("%d\n", frame_number);
 
     float3 result = make_float3(0.0f);
 	int index = screen.x*launch_index.y+launch_index.x;
@@ -107,10 +114,10 @@ RT_PROGRAM void pathtrace_camera()
 	//printf("%f %f %f\n", dir.x, dir.y, dir.z);
     float3 ray_origin = eye;
     float3 ray_direction = dir;
-	unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
+	
 
 	float3 firstRay_direction = ray_direction;
-	bool firstIntersection = false;
+	//bool firstIntersection = false;
 	float t;
     // Initialze per-ray data
     PerRayData_pathtrace prd;
@@ -120,12 +127,17 @@ RT_PROGRAM void pathtrace_camera()
     prd.done = false;
 	prd.seed = seed;
     prd.depth = 0;
+	prd.isSpecular = 0;
 
-	
+	int maxDepth = 5;
+	for (int i = 0; i < maxDepth; i++)
+		isHitBuffer[offset + maxDepth * index + i] = 0;
     // Each iteration is a segment of the ray path.  The closest hit will
     // return new segments to be traced here.
     for(;;)
     {
+		if (prd.depth >= maxDepth)
+			break;
         Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
         rtTrace(top_object, ray, prd);
 
@@ -135,11 +147,12 @@ RT_PROGRAM void pathtrace_camera()
             prd.result += prd.radiance * prd.attenuation;
             break;
         }
-		if (!firstIntersection)
-		{
-			firstIntersection = true;
-			t = prd.tValue;
-		}
+
+		//if (!firstIntersection)
+		//{
+		//	firstIntersection = true;
+		//	t = prd.tValue;
+		//}
         // Russian roulette termination 
         if(prd.depth >= rr_begin_depth)
         {
@@ -149,8 +162,15 @@ RT_PROGRAM void pathtrace_camera()
             prd.attenuation /= pcont;
         }
 
+		prd.result += prd.radiance * prd.attenuation;
+		if (!prd.isSpecular)
+			isHitBuffer[offset + maxDepth * index + prd.depth] = 1;
+
+		// Be careful of calculating the indices!
+		photonBuffer[offset * 2 + maxDepth * index * 2 + prd.depth * 2] = ray.origin + prd.tValue * ray.direction;
+		photonBuffer[offset * 2 + maxDepth * index * 2 + prd.depth * 2 + 1] = prd.result;
         prd.depth++;
-        prd.result += prd.radiance * prd.attenuation;
+        
 
         // Update ray data for the next path segment
         ray_origin = prd.origin;
@@ -165,28 +185,23 @@ RT_PROGRAM void pathtrace_camera()
     float3 pixel_color = result;
 	
 
-    if (frame_number > 1)
-    {
-        float a = 1.0f / (float)frame_number;
-        float3 old_color = make_float3(output_buffer[launch_index]);
-        output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
-		//output_buffer[launch_index] = make_float4(0.5f, 0.0f, 0.0f, 1.0f);
-		//photonBuffer[index * 2 + 1] = lerp( old_color, pixel_color, a );
-		//printf("IN\n");
-    }
-    else
-    {
-        output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
-		//photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]);
-    }
-
-	if (firstIntersection)
-		isHitBuffer[index] = 1;
-	else
-		isHitBuffer[index] = 0;
+  //  if (frame_number > 1)
+  //  {
+  //      float a = 1.0f / (float)frame_number;
+  //      float3 old_color = make_float3(output_buffer[launch_index]);
+  //      output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
+		////output_buffer[launch_index] = make_float4(0.5f, 0.0f, 0.0f, 1.0f);
+		////photonBuffer[index * 2 + 1] = lerp( old_color, pixel_color, a );
+		////printf("IN\n");
+  //  }
+  //  else
+  //  {
+  //      output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
+		////photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]);
+  //  }
 	//printf("%f %f %f %f\n", t, firstRay_direction.x, firstRay_direction.y, firstRay_direction.z);
-	photonBuffer[index * 2] = eye + t * firstRay_direction; // photon world position
-	photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]); // photon color
+	//photonBuffer[index * 2] = eye + t * firstRay_direction;
+	//photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]);
 	//photonBuffer[index * 2 + 1] = make_float3(0.5f, 0.0f, 0.0f);
 	//printf("%f %f %f\n", pixel_color.x, pixel_color.y, pixel_color.z);
 	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
@@ -309,6 +324,7 @@ RT_PROGRAM void specular()
 	float3 result = make_float3(0.0f);
 	current_prd.radiance = result;
 	current_prd.tValue = tValue;
+	current_prd.isSpecular = 1;
  //   float3 result = make_float3(0.0f);
  //   current_prd.radiance = result;
 	//current_prd.done = 1;

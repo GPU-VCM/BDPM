@@ -69,8 +69,8 @@ const char* const SAMPLE_NAME = "optixPathTracer";
 //------------------------------------------------------------------------------
 
 Context        context = 0;
-uint32_t       width  = 512;
-uint32_t       height = 512;
+uint32_t       width  = 600;
+uint32_t       height = 600;
 bool           use_pbo = true;
 
 int            frame_number = 1;
@@ -95,7 +95,7 @@ float3	prepass_camera_lookat;
 float3	prepass_camera_eye;
 Matrix4x4	prepass_camera_rotate;
 bool	prepass_camera_changed = true;
-int	prepass_frame_number = 1;
+int	prepass_frame_number = 0;
 
 // Mouse state
 int2           mouse_prev_pos;
@@ -106,7 +106,8 @@ std::vector<Buffer> vAabbBuffer;
 Context	prepass_context = 0;
 float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
-int photonSamples = 800; // number of samples in 360 degrees
+int photonSamples = 600; // number of samples in 360 degrees
+const int nPrePassIteration = 30;
 
 //------------------------------------------------------------------------------
 //
@@ -260,9 +261,9 @@ void createPrePassContext()
 
 	Buffer buffer = sutil::createOutputBuffer( prepass_context, RT_FORMAT_FLOAT4, photonSamples, photonSamples, use_pbo );
 	prepass_context["output_buffer"]->set( buffer );
-	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, 2 * photonSamples * photonSamples);
+	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, nPrePassIteration * 5 * 2 * photonSamples * photonSamples);
 	prepass_context["photonBuffer"]->set(photonBuffer);
-	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, photonSamples * photonSamples);
+	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, nPrePassIteration * 5 * photonSamples * photonSamples);
 	prepass_context["isHitBuffer"]->set(isHitBuffer);
 
 	// Setup programs
@@ -740,7 +741,7 @@ void updatePrePassCamera()
 	prepass_context[ "W"  ]->setFloat( camera_w );
 
 	if( prepass_camera_changed ) // reset accumulation
-		prepass_frame_number = 1;
+		prepass_frame_number = 0;
 	prepass_camera_changed = false;
 
 }
@@ -954,7 +955,7 @@ void drawPrePassPhoton()
 
 	//glColor3f(0.0f, 0.0f, 1.0f);
 
-	glPointSize(5.0f);
+	glPointSize(1.0f);
 	glEnable(GL_FRAMEBUFFER_SRGB_EXT);
 	glBegin(GL_POINTS);
 
@@ -965,7 +966,7 @@ void drawPrePassPhoton()
 	Photon *photon = (Photon*)data;
 
 	//int i = 0;
-	for (int i = 0; i < photonSamples * photonSamples; i++)
+	for (int i = 0; i < 5 * photonSamples * photonSamples; i++)
 	{
 		if (isHit[i])
 		{
@@ -984,6 +985,11 @@ void drawPrePassPhoton()
 	glEnd();
 }
 
+void setPhotonGLBuffer()
+{
+
+
+}
 void drawPhoton()
 {
 	glMatrixMode (GL_PROJECTION);  
@@ -997,7 +1003,7 @@ void drawPhoton()
 
 	//glColor3f(0.0f, 0.0f, 1.0f);
 
-	glPointSize(3.0f);
+	glPointSize(0.00001f);
 	glEnable(GL_FRAMEBUFFER_SRGB_EXT);
 	glEnable(GL_POINT_SMOOTH);
 	glEnable(GL_DEPTH_TEST);
@@ -1010,10 +1016,13 @@ void drawPhoton()
 	Photon *photon = (Photon*)data;
 
 	//int i = 0;
-	for (int i = 0; i < photonSamples * photonSamples; i++)
+	int nothit=0;
+	int hit = 0;
+	for (int i = 0; i < nPrePassIteration * 5 * photonSamples * photonSamples; i++)
 	{
 		if (isHit[i])
 		{
+			hit++;
 			glColor4f(photon[i].color.x, photon[i].color.y, photon[i].color.z, 1.0f);
 			glVertex4f(photon[i].position.x, photon[i].position.y, photon[i].position.z, 1.0f);
 			//glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1021,9 +1030,11 @@ void drawPhoton()
 		}
 		else
 		{
-
+			//printf("NotHit\n");
+			nothit++;
 		}
 	}
+	//printf("Total Photons:%d\n", hit);
 
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
@@ -1277,8 +1288,9 @@ int main( int argc, char** argv )
 		prepass_context->validate();
 		//glutPrePassRun();
 		updatePrePassCamera();
-		int nPrePassIteration = 2000;
-		while (nPrePassIteration--)
+		
+		int iteration = nPrePassIteration;
+		while (iteration--)
 		{
 			prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
 			prepass_context->launch(0, photonSamples, photonSamples);
