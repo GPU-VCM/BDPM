@@ -272,11 +272,11 @@ RT_PROGRAM void diffuse()
 			if (!shadow_prd.inShadow)
 			{
 				const float A = length(cross(light.v1, light.v2));
-				lightPdf = A;
+				lightPdf = 1 / A;
 				brdfPdf = M_1_PIf * abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z));
 				// convert area based pdf to solid angle
 				const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-				result += light.emission * weight * (lightPdf / (lightPdf + brdfPdf));
+				result += light.emission * LnDl * (lightPdf / (lightPdf + brdfPdf));
 			}
 		}
 	}
@@ -294,10 +294,10 @@ RT_PROGRAM void diffuse()
 
 		const float A = length(cross(lights[0].v1, lights[0].v2));
 		// convert area based pdf to solid angle
-		lightPdf = A;
+		lightPdf = 1 / A;
 		brdfPdf = M_1_PIf* abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z));
 		const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-		result += lights[0].emission * weight * (brdfPdf / (lightPdf + brdfPdf));
+		result += lights[0].emission * LnDl * (brdfPdf / (lightPdf + brdfPdf));
 		//result = make_float3(10.f, 10.f, 0.f);
 	}
 
@@ -343,7 +343,7 @@ RT_PROGRAM void specular()
 
 	// NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
 	// with cosine density.
-	current_prd.attenuation = current_prd.attenuation * specular_color /*/ abs(shading_normal.z)*/;
+	current_prd.attenuation = current_prd.attenuation /** specular_color*/ /*/ abs(shading_normal.z)*/;
 	current_prd.countEmitted = false;
 
 
@@ -381,11 +381,12 @@ RT_PROGRAM void specular()
 			if (!shadow_prd.inShadow)
 			{
 				const float A = length(cross(light.v1, light.v2));
-				lightPdf = A;
+				lightPdf = Ldist * Ldist / (nDl * A);
+				lightPdf = 1 / A;
 				brdfPdf = 1.f;
 				// convert area based pdf to solid angle
 				const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-				result += light.emission * weight * (brdfPdf / (lightPdf + brdfPdf));
+				result += light.emission * LnDl * (lightPdf / (lightPdf + brdfPdf));
 			}
 		}
 	}
@@ -403,10 +404,11 @@ RT_PROGRAM void specular()
 
 		const float A = length(cross(lights[0].v1, lights[0].v2));
 		// convert area based pdf to solid angle
-		lightPdf = A;
+		//lightPdf = Ldist * Ldist / (nDl * A);
+		lightPdf = 1 / A;
 		brdfPdf = 1.f;
 		const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-		result += lights[0].emission * weight * (brdfPdf / (lightPdf + brdfPdf));
+		result += lights[0].emission * LnDl * (brdfPdf / (lightPdf + brdfPdf));
 		//result = make_float3(10.f, 10.f, 0.f);
 	}
 
