@@ -62,6 +62,8 @@ using namespace optix;
 
 const char* const SAMPLE_NAME = "optixPathTracer";
 
+#define MAX_PHOTON 12000000
+
 //------------------------------------------------------------------------------
 //
 // Globals
@@ -108,6 +110,10 @@ float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 600; // number of samples in 360 degrees
 const int nPrePassIteration = 30;
+
+float3 photonPos[MAX_PHOTON];
+float3 photonColor[MAX_PHOTON];
+int validPhoton;
 
 //------------------------------------------------------------------------------
 //
@@ -987,9 +993,33 @@ void drawPrePassPhoton()
 
 void setPhotonGLBuffer()
 {
+	GLvoid* data = 0;
+	RT_CHECK_ERROR(rtBufferMap(prepass_context["isHitBuffer"]->getBuffer()->get(), &data));
+	int *isHit = (int*)data;
+	RT_CHECK_ERROR(rtBufferMap(prepass_context["photonBuffer"]->getBuffer()->get(), &data));
+	Photon *photon = (Photon*)data;
 
+	int nothit=0;
+	validPhoton = 0;
 
+	for (int i = 0; i < nPrePassIteration * 5 * photonSamples * photonSamples; i++)
+	{
+		if (isHit[i])
+		{
+			photonPos[validPhoton] = photon[i].position;
+			photonColor[validPhoton] = photon[i].color;
+			validPhoton++;	
+		}
+		else
+		{
+			nothit++;
+		}
+	}
+
+	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
+	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
 }
+
 void drawPhoton()
 {
 	glMatrixMode (GL_PROJECTION);  
@@ -1001,44 +1031,17 @@ void drawPhoton()
 		camera_lookat.x, camera_lookat.y, camera_lookat.z,
 		camera_up.x, camera_up.y, camera_up.z);
 
-	//glColor3f(0.0f, 0.0f, 1.0f);
-
-	glPointSize(0.00001f);
+	glPointSize(0.001f);
 	glEnable(GL_FRAMEBUFFER_SRGB_EXT);
 	glEnable(GL_POINT_SMOOTH);
 	glEnable(GL_DEPTH_TEST);
-	glBegin(GL_POINTS);
 
-	GLvoid* data = 0;
-	RT_CHECK_ERROR(rtBufferMap(prepass_context["isHitBuffer"]->getBuffer()->get(), &data));
-	int *isHit = (int*)data;
-	RT_CHECK_ERROR(rtBufferMap(prepass_context["photonBuffer"]->getBuffer()->get(), &data));
-	Photon *photon = (Photon*)data;
+	glVertexPointer(3, GL_FLOAT, 0, photonPos);
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glColorPointer(3, GL_FLOAT, 0, photonColor);
+	glEnableClientState(GL_COLOR_ARRAY);
+	glDrawArrays(GL_POINTS, 0, validPhoton);
 
-	//int i = 0;
-	int nothit=0;
-	int hit = 0;
-	for (int i = 0; i < nPrePassIteration * 5 * photonSamples * photonSamples; i++)
-	{
-		if (isHit[i])
-		{
-			hit++;
-			glColor4f(photon[i].color.x, photon[i].color.y, photon[i].color.z, 1.0f);
-			glVertex4f(photon[i].position.x, photon[i].position.y, photon[i].position.z, 1.0f);
-			//glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
-			//printf("%d %f %f %f\n", i, photon[i].position.x, photon[i].position.y, photon[i].position.z);		
-		}
-		else
-		{
-			//printf("NotHit\n");
-			nothit++;
-		}
-	}
-	//printf("Total Photons:%d\n", hit);
-
-	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
-	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
-	glEnd();
 	glDisable(GL_DEPTH_TEST);
 }
 
@@ -1295,6 +1298,7 @@ int main( int argc, char** argv )
 			prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
 			prepass_context->launch(0, photonSamples, photonSamples);
 		}
+		setPhotonGLBuffer();
 
         createContext();
         setupCamera();
