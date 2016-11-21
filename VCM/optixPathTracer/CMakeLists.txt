@@ -40,8 +40,7 @@ if(GLUT_FOUND AND OPENGL_FOUND)
         parallelogram.cu
         sphere.cu
         random.h
-
-        photonPrePass.cu
+		triangle_mesh.cu
         )
 else()
     # GLUT or OpenGL not found
