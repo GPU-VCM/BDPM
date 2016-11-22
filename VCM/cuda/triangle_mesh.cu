@@ -47,6 +47,7 @@ rtBuffer<int>    material_buffer;
 rtDeclareVariable(float3, texcoord,         attribute texcoord, ); 
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, ); 
 rtDeclareVariable(float3, shading_normal,   attribute shading_normal, ); 
+rtDeclareVariable(float3, world_normal, attribute world_normal, ); 
 
 rtDeclareVariable(float3, back_hit_point,   attribute back_hit_point, ); 
 rtDeclareVariable(float3, front_hit_point,  attribute front_hit_point, ); 
@@ -73,7 +74,7 @@ void meshIntersect( int primIdx )
 
       geometric_normal = normalize( n );
       if( normal_buffer.size() == 0 ) {
-        shading_normal = geometric_normal; 
+        world_normal = shading_normal = geometric_normal; 
       } else {
         float3 n0 = normal_buffer[ v_idx.x ];
         float3 n1 = normal_buffer[ v_idx.y ];

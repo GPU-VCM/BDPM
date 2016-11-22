@@ -64,7 +64,7 @@ using namespace optix;
 const char* const SAMPLE_NAME = "optixPathTracer";
 
 #define MAX_PHOTON 20000000
-
+//#define DRAWPHOTON
 //------------------------------------------------------------------------------
 //
 // Globals
@@ -414,16 +414,28 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	//gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
 	//	context));
 	//setMaterial(gis.back(), glass, "diffuse_color", blue);
-
+#define DRAGON
+#ifdef COW
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
 	mesh.context = crtContext;
-	mesh.material = diffuse;
+	mesh.material = glass;
 
-	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 100.f, 250.f)) * Matrix4x4::scale(make_float3(30.f)));
+	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(50.f)));
 	gis.push_back(mesh.geom_instance);
-	setMaterial(gis.back(), diffuse, "diffuse_color", red);
+	setMaterial(gis.back(), glass, "diffuse_color", red);
+#endif
 
+#ifdef DRAGON
+	OptiXMesh mesh;
+	std::string filename = std::string(sutil::samplesDir()) + "/data/dragon.obj";
+	mesh.context = crtContext;
+	mesh.material = glass;
+
+	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 100.f, 250.f)) * Matrix4x4::scale(make_float3(40.f)));
+	gis.push_back(mesh.geom_instance);
+	setMaterial(gis.back(), glass, "diffuse_color", red);
+#endif
 
     GeometryGroup shadow_group = crtContext->createGeometryGroup(gis.begin(), gis.end());
     shadow_group->setAcceleration( crtContext->createAcceleration( "Trbvh" ) );
@@ -454,9 +466,9 @@ void setupCamera()
 
 void setupPrePassCamera()
 {
-	prepass_camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
+	//prepass_camera_eye    = make_float3( 278.0f, 273.0f, -900.0f );
 	prepass_camera_eye    = make_float3( 343.0f, 548.6f, 227.0f );
-	prepass_camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
+	//prepass_camera_lookat = make_float3( 278.0f, 273.0f,    0.0f );
 	prepass_camera_lookat = make_float3( 278.0f, 0.0f,    250.0f );
 	prepass_camera_up     = make_float3(   0.0f,   1.0f,    0.0f );
 
@@ -598,34 +610,6 @@ void glutRun()
     glutMainLoop();
 }
 
-void glutPrePassRun()
-{
-	// Initialize GL state                                                            
-	glMatrixMode(GL_PROJECTION);                                                   
-	glLoadIdentity();                                                              
-	glOrtho(0, 1, 0, 1, -1, 1 );                                                   
-
-	glMatrixMode(GL_MODELVIEW);                                                    
-	glLoadIdentity();                                                              
-
-	glViewport(0, 0, width, height);                                 
-
-	glutShowWindow();                                                              
-	glutReshapeWindow( width, height);
-
-	// register glut callbacks
-	glutDisplayFunc( glutPrePassDisplay );
-	glutIdleFunc( glutPrePassDisplay );
-	glutReshapeFunc( glutResize );
-	//glutKeyboardFunc( glutKeyboardPress );
-	//glutMouseFunc( glutMousePress );
-	glutMotionFunc( glutPrePassMouseMotion );
-
-	registerExitHandler();
-
-	glutMainLoop();
-}
-
 //------------------------------------------------------------------------------
 //
 //  GLUT callbacks
@@ -684,117 +668,6 @@ void drawBoundingBox()
 		RT_CHECK_ERROR(rtBufferUnmap(vAabbBuffer[i]->get()));
 	}
 
-	glEnd();
-}
-
-void drawPrePassBoundingBox()
-{
-	glMatrixMode (GL_PROJECTION);  
-	glLoadIdentity ();  
-	gluPerspective(150.0, (GLfloat) width/(GLfloat) height, 0.01, 20000.0);  
-	glMatrixMode(GL_MODELVIEW);  
-	glLoadIdentity();  
-	gluLookAt(prepass_camera_eye.x, prepass_camera_eye.y, prepass_camera_eye.z,
-		prepass_camera_lookat.x, prepass_camera_lookat.y, prepass_camera_lookat.z,
-		prepass_camera_up.x, prepass_camera_up.y, prepass_camera_up.z);
-
-	glColor3f(0.0f, 0.0f, 1.0f);
-
-	glBegin(GL_LINES);
-
-	int size = vAabbBuffer.size();
-	for (int i = 0; i < size; i++)
-	{
-		GLvoid* data = 0;
-		RT_CHECK_ERROR(rtBufferMap(vAabbBuffer[i]->get(), &data));
-		float *f = (float*)data;
-		glVertex3f(f[0], f[1], f[2]);
-		glVertex3f(f[0], f[4], f[2]);
-		glVertex3f(f[0], f[1], f[2]);
-		glVertex3f(f[0], f[1], f[5]);
-		glVertex3f(f[0], f[1], f[2]);
-		glVertex3f(f[3], f[1], f[2]);
-
-		glVertex3f(f[3], f[1], f[5]);
-		glVertex3f(f[3], f[4], f[5]);
-		glVertex3f(f[3], f[1], f[5]);
-		glVertex3f(f[0], f[1], f[5]);
-		glVertex3f(f[3], f[1], f[5]);
-		glVertex3f(f[3], f[1], f[2]);
-
-		glVertex3f(f[3], f[4], f[2]);
-		glVertex3f(f[3], f[1], f[2]);
-		glVertex3f(f[3], f[4], f[2]);
-		glVertex3f(f[3], f[4], f[5]);
-		glVertex3f(f[3], f[4], f[2]);
-		glVertex3f(f[0], f[4], f[2]);
-
-		glVertex3f(f[0], f[4], f[5]);
-		glVertex3f(f[0], f[1], f[5]);
-		glVertex3f(f[0], f[4], f[5]);
-		glVertex3f(f[3], f[4], f[5]);
-		glVertex3f(f[0], f[4], f[5]);
-		glVertex3f(f[0], f[4], f[2]);
-		//printf("%f %f %f %f %f %f\n", f[0], f[1], f[2], f[3], f[4], f[5]);
-		RT_CHECK_ERROR(rtBufferUnmap(vAabbBuffer[i]->get()));
-	}
-
-	glEnd();
-}
-
-void testGetBuffer()
-{
-	int size = vAabbBuffer.size();
-	for (int i = 0; i < size; i++)
-	{
-		GLvoid* data = 0;
-		RT_CHECK_ERROR(rtBufferMap(vAabbBuffer[i]->get(), &data));
-		float *f = (float*)data;
-		printf("%f %f %f %f %f %f\n", f[0], f[1], f[2], f[3], f[4], f[5]);
-		RT_CHECK_ERROR(rtBufferUnmap(vAabbBuffer[i]->get()));
-	}
-}
-
-void drawPrePassPhoton()
-{
-	glMatrixMode (GL_PROJECTION);  
-	glLoadIdentity ();  
-	gluPerspective(150.0, (GLfloat) width/(GLfloat) height, 0.01, 20000.0);  
-	glMatrixMode(GL_MODELVIEW);  
-	glLoadIdentity();  
-	gluLookAt(prepass_camera_eye.x, prepass_camera_eye.y, prepass_camera_eye.z,
-		prepass_camera_lookat.x, prepass_camera_lookat.y, prepass_camera_lookat.z,
-		prepass_camera_up.x, prepass_camera_up.y, prepass_camera_up.z);
-
-	//glColor3f(0.0f, 0.0f, 1.0f);
-
-	glPointSize(1.0f);
-	glEnable(GL_FRAMEBUFFER_SRGB_EXT);
-	glBegin(GL_POINTS);
-
-	GLvoid* data = 0;
-	RT_CHECK_ERROR(rtBufferMap(prepass_context["isHitBuffer"]->getBuffer()->get(), &data));
-	int *isHit = (int*)data;
-	RT_CHECK_ERROR(rtBufferMap(prepass_context["photonBuffer"]->getBuffer()->get(), &data));
-	Photon *photon = (Photon*)data;
-
-	//int i = 0;
-	for (int i = 0; i < 5 * photonSamples * photonSamples; i++)
-	{
-		if (isHit[i])
-		{
-			glColor4f(photon[i].color.x, photon[i].color.y, photon[i].color.z, 1.0f);
-			glVertex3f(photon[i].position.x, photon[i].position.y, photon[i].position.z);
-			//printf("%d %f %f %f\n", i, photon[i].position.x, photon[i].position.y, photon[i].position.z);		
-		}
-		else
-		{
-
-		}
-	}
-
-	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
-	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
 	glEnd();
 }
 
@@ -861,9 +734,12 @@ void glutDisplay()
     updateCamera();
     context->launch( 0, width, height );
 
-    //sutil::displayBufferGL( getOutputBuffer() );
+#ifdef DRAWPHOTON
+    drawPhoton();
+#else
+	sutil::displayBufferGL( getOutputBuffer());
+#endif	
 	
-	drawPhoton();
 	//drawBoundingBox();
 	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     {
@@ -873,22 +749,6 @@ void glutDisplay()
 
     glutSwapBuffers();
 	
-}
-
-// deprecated function, never use it
-
-void glutPrePassDisplay()
-{
-	updatePrePassCamera();
-	prepass_context->launch(0, width, height);
-	
-	//sutil::displayBufferGL( prepass_context["output_buffer"]->getBuffer() );
-	//drawPrePassBoundingBox();
-	drawPrePassPhoton();
-	static unsigned prepass_frame_count = 0;
-	sutil::displayFps(prepass_frame_count++);
-
-	glutSwapBuffers();
 }
 
 void glutKeyboardPress( unsigned char k, int x, int y )
@@ -973,36 +833,6 @@ void glutMouseMotion( int x, int y)
 	}
 
     mouse_prev_pos = make_int2( x, y );
-}
-
-void glutPrePassMouseMotion( int x, int y)
-{
-	if( mouse_button == GLUT_RIGHT_BUTTON )
-	{
-		const float dx = static_cast<float>( x - mouse_prev_pos.x ) /
-			static_cast<float>( width );
-		const float dy = static_cast<float>( y - mouse_prev_pos.y ) /
-			static_cast<float>( height );
-		const float dmax = fabsf( dx ) > fabs( dy ) ? dx : dy;
-		const float scale = std::min<float>( dmax, 0.9f );
-		prepass_camera_eye = prepass_camera_eye + (prepass_camera_lookat - prepass_camera_eye)*scale;
-		prepass_camera_changed = true;
-	}
-	else if( mouse_button == GLUT_LEFT_BUTTON )
-	{
-		const float2 from = { static_cast<float>(mouse_prev_pos.x),
-			static_cast<float>(mouse_prev_pos.y) };
-		const float2 to   = { static_cast<float>(x),
-			static_cast<float>(y) };
-
-		const float2 a = { from.x / width, from.y / height };
-		const float2 b = { to.x   / width, to.y   / height };
-
-		prepass_camera_rotate = arcball.rotate( b, a );
-		prepass_camera_changed = true;
-	}
-
-	mouse_prev_pos = make_int2( x, y );
 }
 
 void glutResize( int w, int h )
@@ -1095,6 +925,7 @@ int main( int argc, char** argv )
         glewInit();
 #endif
 
+#ifdef DRAWPHOTON
 		createPrePassContext();
 		setupPrePassCamera();
 		//loadPrePassGeometry();
@@ -1102,6 +933,7 @@ int main( int argc, char** argv )
 		prepass_context->validate();
 		//glutPrePassRun();
 		updatePrePassCamera();
+
 		
 		int iteration = nPrePassIteration;
 		while (iteration--)
@@ -1110,6 +942,7 @@ int main( int argc, char** argv )
 			prepass_context->launch(0, photonSamples, photonSamples);
 		}
 		setPhotonGLBuffer();
+#endif
 
         createContext();
         setupCamera();
