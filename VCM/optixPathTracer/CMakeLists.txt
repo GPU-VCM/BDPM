@@ -41,6 +41,7 @@ if(GLUT_FOUND AND OPENGL_FOUND)
         sphere.cu
         random.h
 		triangle_mesh.cu
+		intersection_refinement.h
         )
 else()
     # GLUT or OpenGL not found

@@ -53,6 +53,7 @@
 #include <sutil.h>
 #include <Arcball.h>
 #include <OptiXMesh.h>
+#include "random.h"
 
 #include <algorithm>
 #include <cstring>
@@ -309,8 +310,8 @@ void loadGeometry(const std::string mesh_file)
 	pgram_intersection = context->createProgramFromPTXFile(ptx_path, "intersect");
 
 	ptx_path = ptxPath("triangle_mesh.cu");
-	tri_bounding_box = context->createProgramFromPTXFile(ptx_path, "boundingBoxMesh");
-	tri_intersection = context->createProgramFromPTXFile(ptx_path, "meshIntersect");
+	tri_bounding_box = context->createProgramFromPTXFile(ptx_path, "mesh_bounds");
+	tri_intersection = context->createProgramFromPTXFile(ptx_path, "mesh_intersect");
 
 	// create geometry instances
 	std::vector<GeometryInstance> gis;
@@ -336,8 +337,8 @@ void loadGeometry(const std::string mesh_file)
 	gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 559.2f),
 		make_float3(0.0f, 548.8f, 0.0f),
 		make_float3(556.0f, 0.0f, 0.0f)));
-	setMaterial(gis.back(), specular, "specular_color", white);
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//setMaterial(gis.back(), specular, "specular_color", white);
+	setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
 	// Right wall
 	gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
@@ -395,93 +396,37 @@ void loadGeometry(const std::string mesh_file)
 		make_float3(158.0f, 0.0f, -49.0f)));
 	setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
+	//load mesh
+	OptiXMesh mesh;
+	mesh.context = context;
+
+	mesh.intersection = tri_intersection;
+	mesh.bounds = tri_bounding_box;
+	mesh.material = diffuse;
+	loadMesh(mesh_file, mesh, Matrix4x4::scale(make_float3(3000.f)) * Matrix4x4::translate(make_float3(0.1f, 0.f, 0.1f)));
+	gis.push_back(mesh.geom_instance);
+	setMaterial(gis.back(), diffuse, "diffuse_color", red);
+
 	// Create shadow group (no light)
 	GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
 	shadow_group->setAcceleration(context->createAcceleration("Trbvh"));
 	context["top_shadower"]->set(shadow_group);
 
-	//// Light
+	// Light
 	gis.push_back(createParallelogram(make_float3(343.0f, 548.6f, 227.0f),
 		make_float3(-130.0f, 0.0f, 0.0f),
 		make_float3(0.0f, 0.0f, 105.0f)));
 	setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
 
-	/*OptiXMesh mesh;
-	mesh.context = context;
-	mesh.intersection = tri_intersection;
-	mesh.bounds = tri_bounding_box;
-
-	loadMesh(mesh_file, mesh);
-	GeometryInstance geom_inst = context->createGeometryInstance();
-	geom_inst->setGeometry(mesh.geom_instance->getGeometry());
-	gis.push_back(geom_inst);
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);*/
-	//Mesh mesh;
-	//mesh.context = context;
-	//loadMesh(mesh_file, mesh);
-
-	//optix::Aabb aabb;
-	//float3 bbox_min = make_float3(mesh.bbox_min[0], mesh.bbox_min[1], mesh.bbox_min[2]);
-	//float3 bbox_max = make_float3(mesh.bbox_max[0], mesh.bbox_max[1], mesh.bbox_max[2]);
-	//aabb.set(bbox_min, bbox_max);
-
-	//// Create geometry group
+	// Create geometry group
 
 	Acceleration acc = context->createAcceleration("Trbvh");
 
-	//Buffer noTexCoord = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT2, 1);
-	//Buffer noTangents = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, 1);
-
-	////loading indices
-	//Buffer index_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_INT3, mesh.num_triangles);
-	///*int3 *tmp_index = static_cast<int3 *>(index_buffer->map());*/
-	//int3 *tmp_index = static_cast<int3 *>(index_buffer->map());
-	//for (int n = 0; n< mesh.num_triangles; n++){
-	//	tmp_index[n] = make_int3(mesh.tri_indices[n * 3 + 0], mesh.tri_indices[n * 3 + 1], mesh.tri_indices[n * 3 + 2]);
-	//}
-	//index_buffer->unmap();
-	//index_buffer->validate();
-
-	////loading vertices
-	//Buffer vertex_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, mesh.num_vertices);
-	//float3 *tmp_vertex = static_cast<float3 *>(vertex_buffer->map());
-	//for (int n = 0; n<mesh.num_vertices; n += 3){
-	//	tmp_vertex[n] = make_float3(mesh.positions[n + 0], mesh.positions[n + 1], mesh.positions[n + 2]);
-	//}
-	//vertex_buffer->unmap();
-	//vertex_buffer->validate();
-
-	//Buffer normal_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT3, 0);
-
-	////loading tex coordinates if available
-	//Buffer texCoord_buffer;
-	//
-	//texCoord_buffer = context->createBuffer(RT_BUFFER_INPUT, RT_FORMAT_FLOAT2, 0);
-
-	/*Geometry optix_mesh = context->createGeometry();
-	optix_mesh->setPrimitiveCount(mesh.num_triangles);
-
-	optix_mesh["vertex_buffer"]->set(vertex_buffer);
-	optix_mesh["index_buffer"]->set(index_buffer);
-	optix_mesh["normal_buffer"]->set(normal_buffer);
-
-	optix_mesh["texcoord_buffer"]->set(texCoord_buffer);
-	GeometryInstance instance = context->createGeometryInstance();
-	optix_mesh->setIntersectionProgram(tri_intersection);
-	optix_mesh->setBoundingBoxProgram(tri_bounding_box);
-	instance->setGeometry(optix_mesh);*/
-	//instance->setMaterialCount(1);
-	//instance->setMaterial(0, diffuse);
-	/*gis.push_back(instance);
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);*/
 	GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
-	/*optix_mesh["tangent_buffer"]->set(tangent_buffer);
-	optix_mesh["bitangent_buffer"]->set(bitangent_buffer);*/
-	//geometry_group->addChild(mesh.geom_instance);
 	geometry_group->setAcceleration(acc);
+	acc->markDirty();
 
 	context["top_object"]->set(geometry_group);
-	context["top_shadower"]->set(geometry_group);
 }
 
 
@@ -709,7 +654,7 @@ void printUsageAndExit(const std::string& argv0)
 int main(int argc, char** argv)
 {
 	std::string out_file;
-	std::string mesh_file = std::string(sutil::samplesDir()) + "/data/head.obj";
+	std::string mesh_file = std::string(sutil::samplesDir()) + "/data/cow.obj";
 	for (int i = 1; i<argc; ++i)
 	{
 		const std::string arg(argv[i]);

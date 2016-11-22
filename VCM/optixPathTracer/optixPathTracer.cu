@@ -232,7 +232,7 @@ RT_PROGRAM void diffuse()
 	optix::Onb onb(ffnormal);
 	onb.inverse_transform(p);
 	current_prd.direction = p;
-
+	//rtPrintf("hitpoint: %f, %f, %f\n", hitpoint.x, hitpoint.y, hitpoint.z);
 	// NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
 	// with cosine density.
 	current_prd.attenuation = current_prd.attenuation * diffuse_color;
@@ -271,35 +271,36 @@ RT_PROGRAM void diffuse()
 
 			if (!shadow_prd.inShadow)
 			{
+				
 				const float A = length(cross(light.v1, light.v2));
 				lightPdf = 1 / A;
-				brdfPdf = M_1_PIf * abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z));
+				brdfPdf = M_1_PIf /** abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z))*/;
 				// convert area based pdf to solid angle
 				const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-				result += light.emission * LnDl * (lightPdf / (lightPdf + brdfPdf));
+				result += light.emission * weight /** (lightPdf / (lightPdf + brdfPdf))*/;
 			}
 		}
 	}
-	Ray brdf_ray = make_Ray(hitpoint, p, pathtrace_light_ray_type, scene_epsilon, RT_DEFAULT_MAX);
-	PerRayData_pathtrace_light brdf_prd;
-	brdf_prd.hitLight = false;
-	rtTrace(top_object, brdf_ray, brdf_prd);
-	if (brdf_prd.hitLight){
-		brdfPdf = M_1_PIf;
-		float3 lgt_hitpoint = brdf_ray.origin + t_hit * brdf_ray.direction;
-		const float  Ldist = length(lgt_hitpoint - hitpoint);
-		const float3 L = normalize(lgt_hitpoint - hitpoint);
-		const float  nDl = dot(ffnormal, L);
-		const float  LnDl = dot(lights[0].normal, L);
+	//Ray brdf_ray = make_Ray(hitpoint, p, pathtrace_light_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+	//PerRayData_pathtrace_light brdf_prd;
+	//brdf_prd.hitLight = false;
+	//rtTrace(top_object, brdf_ray, brdf_prd);
+	//if (brdf_prd.hitLight){
+	//	brdfPdf = M_1_PIf;
+	//	float3 lgt_hitpoint = brdf_ray.origin + t_hit * brdf_ray.direction;
+	//	const float  Ldist = length(lgt_hitpoint - hitpoint);
+	//	const float3 L = normalize(lgt_hitpoint - hitpoint);
+	//	const float  nDl = dot(ffnormal, L);
+	//	const float  LnDl = dot(lights[0].normal, L);
 
-		const float A = length(cross(lights[0].v1, lights[0].v2));
-		// convert area based pdf to solid angle
-		lightPdf = 1 / A;
-		brdfPdf = M_1_PIf* abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z));
-		const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-		result += lights[0].emission * LnDl * (brdfPdf / (lightPdf + brdfPdf));
-		//result = make_float3(10.f, 10.f, 0.f);
-	}
+	//	const float A = length(cross(lights[0].v1, lights[0].v2));
+	//	// convert area based pdf to solid angle
+	//	lightPdf = 1 / A;
+	//	brdfPdf = M_1_PIf/** abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z))*/;
+	//	const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
+	//	result += lights[0].emission * LnDl * (brdfPdf / (lightPdf + brdfPdf));
+	//	//result = make_float3(10.f, 10.f, 0.f);
+	//}
 
 	current_prd.radiance = result;
 }
