@@ -313,7 +313,7 @@ void createContext()
 }
 
 
-void loadGeometry()
+void loadGeometry(Context& crtContext, std::string cudaFileName)
 {
     // Light buffer
     ParallelogramLight light;
@@ -323,48 +323,48 @@ void loadGeometry()
     light.normal   = normalize( cross(light.v1, light.v2) );
     light.emission = make_float3( 15.0f, 15.0f, 5.0f );
 
-    Buffer light_buffer = context->createBuffer( RT_BUFFER_INPUT );
+    Buffer light_buffer = crtContext->createBuffer( RT_BUFFER_INPUT );
     light_buffer->setFormat( RT_FORMAT_USER );
     light_buffer->setElementSize( sizeof( ParallelogramLight ) );
     light_buffer->setSize( 1u );
     memcpy( light_buffer->map(), &light, sizeof( light ) );
     light_buffer->unmap();
-    context["lights"]->setBuffer( light_buffer );
+    crtContext["lights"]->setBuffer( light_buffer );
 
 
     // Set up material
-    const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
+    const std::string cuda_file = cudaFileName;
     std::string ptx_path = ptxPath( cuda_file );
-    Material diffuse = context->createMaterial();
-    Program diffuse_ch = context->createProgramFromPTXFile( ptx_path, "diffuse" );
-    Program diffuse_ah = context->createProgramFromPTXFile( ptx_path, "shadow" );
+    Material diffuse = crtContext->createMaterial();
+    Program diffuse_ch = crtContext->createProgramFromPTXFile( ptx_path, "diffuse" );
+    Program diffuse_ah = crtContext->createProgramFromPTXFile( ptx_path, "shadow" );
     diffuse->setClosestHitProgram( 0, diffuse_ch );
     diffuse->setAnyHitProgram( 1, diffuse_ah );
 
-	Material specular = context->createMaterial();
-	Program specular_ch = context->createProgramFromPTXFile(ptx_path, "specular");
-	Program specular_ah = context->createProgramFromPTXFile(ptx_path, "shadow");
+	Material specular = crtContext->createMaterial();
+	Program specular_ch = crtContext->createProgramFromPTXFile(ptx_path, "specular");
+	Program specular_ah = crtContext->createProgramFromPTXFile(ptx_path, "shadow");
 	specular->setClosestHitProgram(0, specular_ch);
 	specular->setAnyHitProgram(1, specular_ah);
 
-    Material diffuse_light = context->createMaterial();
-    Program diffuse_em = context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
+    Material diffuse_light = crtContext->createMaterial();
+    Program diffuse_em = crtContext->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
     diffuse_light->setClosestHitProgram( 0, diffuse_em );
 
-	Material glass = context->createMaterial();
-	Program glass_ch = context->createProgramFromPTXFile(ptx_path, "glass_closest_hit_radiance");
-	Program glass_ah = context->createProgramFromPTXFile(ptx_path, "shadow");
+	Material glass = crtContext->createMaterial();
+	Program glass_ch = crtContext->createProgramFromPTXFile(ptx_path, "glass_closest_hit_radiance");
+	Program glass_ah = crtContext->createProgramFromPTXFile(ptx_path, "shadow");
 	glass->setClosestHitProgram(0, glass_ch);
 	glass->setAnyHitProgram(1, glass_ah);
 
     // Set up parallelogram programs
     ptx_path = ptxPath( "parallelogram.cu" );
-    pgram_bounding_box = context->createProgramFromPTXFile( ptx_path, "bounds" );
-    pgram_intersection = context->createProgramFromPTXFile( ptx_path, "intersect" );
+    pgram_bounding_box = crtContext->createProgramFromPTXFile( ptx_path, "bounds" );
+    pgram_intersection = crtContext->createProgramFromPTXFile( ptx_path, "intersect" );
 
 	ptx_path = ptxPath("sphere.cu");
-	sphere_bounding_box = context->createProgramFromPTXFile(ptx_path, "bounds");
-	sphere_intersection = context->createProgramFromPTXFile(ptx_path, "intersect");
+	sphere_bounding_box = crtContext->createProgramFromPTXFile(ptx_path, "bounds");
+	sphere_intersection = crtContext->createProgramFromPTXFile(ptx_path, "intersect");
 
     // create geometry instances
     std::vector<GeometryInstance> gis;
@@ -380,106 +380,36 @@ void loadGeometry()
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
                                         make_float3( 0.0f, 0.0f, 559.2f ),
                                         make_float3( 556.0f, 0.0f, 0.0f ),
-										context) );
+										crtContext) );
     setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Ceiling
     gis.push_back( createParallelogram( make_float3( 0.0f, 548.8f, 0.0f ),
                                         make_float3( 556.0f, 0.0f, 0.0f ),
 										make_float3( 0.0f, 0.0f, 559.2f ),
-										context ) );
+										crtContext ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Back wall
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 559.2f),
                                         make_float3( 0.0f, 548.8f, 0.0f),
 										make_float3( 556.0f, 0.0f, 0.0f),
-										context ) );
+										crtContext ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", gray);
 
     // Right wall
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
                                         make_float3( 0.0f, 548.8f, 0.0f ),
 										make_float3( 0.0f, 0.0f, 559.2f ),
-										context ) );
+										crtContext ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", green);
 
     // Left wall
     gis.push_back( createParallelogram( make_float3( 556.0f, 0.0f, 0.0f ),
                                         make_float3( 0.0f, 0.0f, 559.2f ),
 										make_float3( 0.0f, 548.8f, 0.0f ),
-										context ) );
+										crtContext ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", red);
-
-    // Short block
-    //gis.push_back( createParallelogram( make_float3( 130.0f, 165.0f, 65.0f),
-    //                                    make_float3( -48.0f, 0.0f, 160.0f),
-    //                                    make_float3( 160.0f, 0.0f, 49.0f) ) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createParallelogram( make_float3( 290.0f, 0.0f, 114.0f),
-	//	make_float3( 0.0f, 165.0f, 0.0f),
-	//	make_float3( -50.0f, 0.0f, 158.0f) ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    //gis.push_back( createParallelogram( make_float3( 130.0f, 0.0f, 65.0f),
-    //                                    make_float3( 0.0f, 165.0f, 0.0f),
-    //                                    make_float3( 160.0f, 0.0f, 49.0f) ) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    //gis.push_back( createParallelogram( make_float3( 82.0f, 0.0f, 225.0f),
-    //                                    make_float3( 0.0f, 165.0f, 0.0f),
-    //                                    make_float3( 48.0f, 0.0f, -160.0f) ) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    //gis.push_back( createParallelogram( make_float3( 240.0f, 0.0f, 272.0f),
-    //                                    make_float3( 0.0f, 165.0f, 0.0f),
-    //                                    make_float3( -158.0f, 0.0f, -47.0f) ) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-    // Tall block
-    //gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
-    //                                    make_float3( -158.0f, 0.0f, 49.0f),
-    //                                    make_float3( 49.0f, 0.0f, 159.0f),
-				//						context) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    //gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
-    //                                    make_float3( 0.0f, 330.0f, 0.0f),
-				//						make_float3( 49.0f, 0.0f, 159.0f),
-				//						context ) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    //gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
-    //                                    make_float3( 0.0f, 330.0f, 0.0f),
-				//						make_float3( -158.0f, 0.0f, 50.0f),
-				//						context ) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    //gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
-    //                                    make_float3( 0.0f, 330.0f, 0.0f),
-				//						make_float3( -49.0f, 0.0f, -160.0f),
-				//						context ) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    //gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
-    //                                    make_float3( 0.0f, 330.0f, 0.0f),
-				//						make_float3( 158.0f, 0.0f, -49.0f),
-				//						context ) );
-    //setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-	//gis.push_back( createSphere( make_float3( 423.0f, 330.0f, 247.0f),
-	//	make_float3( -158.0f, 0.0f, 49.0f),
-	//	make_float3( 49.0f, 0.0f, 159.0f) ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createSphere( make_float3( 423.0f, 0.0f, 247.0f),
-	//	make_float3( 0.0f, 330.0f, 0.0f),
-	//	make_float3( 49.0f, 0.0f, 159.0f) ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createSphere( make_float3( 472.0f, 0.0f, 406.0f),
-	//	make_float3( 0.0f, 330.0f, 0.0f),
-	//	make_float3( -158.0f, 0.0f, 50.0f) ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createSphere( make_float3( 314.0f, 0.0f, 456.0f),
-	//	make_float3( 0.0f, 330.0f, 0.0f),
-	//	make_float3( -49.0f, 0.0f, -160.0f) ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createSphere( make_float3( 265.0f, 0.0f, 296.0f),
-	//	make_float3( 0.0f, 330.0f, 0.0f),
-	//	make_float3( 158.0f, 0.0f, -49.0f) ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
 	//gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
 	//	context));
@@ -487,7 +417,7 @@ void loadGeometry()
 
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
-	mesh.context = context;
+	mesh.context = crtContext;
 	mesh.material = diffuse;
 
 	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 100.f, 250.f)) * Matrix4x4::scale(make_float3(30.f)));
@@ -495,169 +425,22 @@ void loadGeometry()
 	setMaterial(gis.back(), diffuse, "diffuse_color", red);
 
 
-    GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
-    shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
-    context["top_shadower"]->set( shadow_group );
+    GeometryGroup shadow_group = crtContext->createGeometryGroup(gis.begin(), gis.end());
+    shadow_group->setAcceleration( crtContext->createAcceleration( "Trbvh" ) );
+    crtContext["top_shadower"]->set( shadow_group );
 
     // Light
     gis.push_back( createParallelogram( make_float3( 343.0f, 548.6f, 227.0f),
                                         make_float3( -130.0f, 0.0f, 0.0f),
                                         make_float3( 0.0f, 0.0f, 105.0f),
-										context) );
+										crtContext) );
     setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
 
     // Create geometry group
-    GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
+    GeometryGroup geometry_group = crtContext->createGeometryGroup(gis.begin(), gis.end());
 	//geometry_group->addChild(mesh.geom_instance);
-    geometry_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
-    context["top_object"]->set( geometry_group );
-}
-
-void loadPrePassGeometry()
-{
-	// Light buffer
-	ParallelogramLight light;
-	light.corner   = make_float3( 343.0f, 548.6f, 227.0f);
-	light.v1       = make_float3( -130.0f, 0.0f, 0.0f);
-	light.v2       = make_float3( 0.0f, 0.0f, 105.0f);
-	light.normal   = normalize( cross(light.v1, light.v2) );
-	light.emission = make_float3( 15.0f, 15.0f, 5.0f );
-
-	Buffer light_buffer = prepass_context->createBuffer( RT_BUFFER_INPUT );
-	light_buffer->setFormat( RT_FORMAT_USER );
-	light_buffer->setElementSize( sizeof( ParallelogramLight ) );
-	light_buffer->setSize( 1u );
-	memcpy( light_buffer->map(), &light, sizeof( light ) );
-	light_buffer->unmap();
-	prepass_context["lights"]->setBuffer( light_buffer );
-
-	// Set up material
-	const std::string cuda_file = "photonPrePass.cu";
-	std::string ptx_path = ptxPath( cuda_file );
-	Material diffuse = prepass_context->createMaterial();
-	Program diffuse_ch = prepass_context->createProgramFromPTXFile( ptx_path, "diffuse" );
-	Program diffuse_ah = prepass_context->createProgramFromPTXFile( ptx_path, "shadow" );
-	diffuse->setClosestHitProgram( 0, diffuse_ch );
-	diffuse->setAnyHitProgram( 1, diffuse_ah );
-
-	Material specular = prepass_context->createMaterial();
-	Program specular_ch = prepass_context->createProgramFromPTXFile(ptx_path, "specular");
-	Program specular_ah = prepass_context->createProgramFromPTXFile(ptx_path, "shadow");
-	specular->setClosestHitProgram(0, specular_ch);
-	specular->setAnyHitProgram(1, specular_ah);
-
-	Material diffuse_light = prepass_context->createMaterial();
-	Program diffuse_em = prepass_context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
-	diffuse_light->setClosestHitProgram( 0, diffuse_em );
-
-	Material glass = prepass_context->createMaterial();
-	Program glass_ch = prepass_context->createProgramFromPTXFile(ptx_path, "glass_closest_hit_radiance");
-	Program glass_ah = prepass_context->createProgramFromPTXFile(ptx_path, "shadow");
-	glass->setClosestHitProgram(0, glass_ch);
-	glass->setAnyHitProgram(1, glass_ah);
-
-	// Set up parallelogram programs
-	ptx_path = ptxPath( "parallelogram.cu" );
-	pgram_bounding_box = prepass_context->createProgramFromPTXFile( ptx_path, "bounds" );
-	pgram_intersection = prepass_context->createProgramFromPTXFile( ptx_path, "intersect" );
-
-	ptx_path = ptxPath("sphere.cu");
-	sphere_bounding_box = prepass_context->createProgramFromPTXFile(ptx_path, "bounds");
-	sphere_intersection = prepass_context->createProgramFromPTXFile(ptx_path, "intersect");
-
-	// create geometry instances
-	std::vector<GeometryInstance> gis;
-
-	const float3 white = make_float3( 0.8f, 0.8f, 0.8f );
-	const float3 green = make_float3( 0.05f, 0.8f, 0.05f );
-	const float3 red   = make_float3( 0.8f, 0.05f, 0.05f );
-	const float3 light_em = make_float3( 15.0f, 15.0f, 5.0f );
-	const float3 gray = make_float3(0.5f, 0.5f, 0.5f);
-	const float3 blue = make_float3(0.05f, 0.05f, 0.8f);
-
-	// Floor
-	gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
-		make_float3( 0.0f, 0.0f, 559.2f ),
-		make_float3( 556.0f, 0.0f, 0.0f ),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", gray);
-
-	// Ceiling
-	gis.push_back( createParallelogram( make_float3( 0.0f, 548.8f, 0.0f ),
-		make_float3( 556.0f, 0.0f, 0.0f ),
-		make_float3( 0.0f, 0.0f, 559.2f ),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", gray);
-
-	// Back wall
-	gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 559.2f),
-		make_float3( 0.0f, 548.8f, 0.0f),
-		make_float3( 556.0f, 0.0f, 0.0f),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", gray);
-
-	// Right wall
-	gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
-		make_float3( 0.0f, 548.8f, 0.0f ),
-		make_float3( 0.0f, 0.0f, 559.2f ),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", green);
-
-	// Left wall
-	gis.push_back( createParallelogram( make_float3( 556.0f, 0.0f, 0.0f ),
-		make_float3( 0.0f, 0.0f, 559.2f ),
-		make_float3( 0.0f, 548.8f, 0.0f ),
-		prepass_context ) );
-	setMaterial(gis.back(), diffuse, "diffuse_color", red);
-
-
-	// Tall block
-	//gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
-	//	make_float3( -158.0f, 0.0f, 49.0f),
-	//	make_float3( 49.0f, 0.0f, 159.0f),
-	//	prepass_context	) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
-	//	make_float3( 0.0f, 330.0f, 0.0f),
-	//	make_float3( 49.0f, 0.0f, 159.0f),
-	//	prepass_context ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
-	//	make_float3( 0.0f, 330.0f, 0.0f),
-	//	make_float3( -158.0f, 0.0f, 50.0f),
-	//	prepass_context ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
-	//	make_float3( 0.0f, 330.0f, 0.0f),
-	//	make_float3( -49.0f, 0.0f, -160.0f),
-	//	prepass_context ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
-	//	make_float3( 0.0f, 330.0f, 0.0f),
-	//	make_float3( 158.0f, 0.0f, -49.0f),
-	//	prepass_context ) );
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
-		prepass_context));
-	setMaterial(gis.back(), glass, "diffuse_color", blue);
-
-	GeometryGroup shadow_group = prepass_context->createGeometryGroup(gis.begin(), gis.end());
-	shadow_group->setAcceleration( prepass_context->createAcceleration( "Trbvh" ) );
-	prepass_context["top_shadower"]->set( shadow_group );
-
-	// Light
-	gis.push_back( createParallelogram( make_float3( 343.0f, 548.6f, 227.0f),
-		make_float3( -130.0f, 0.0f, 0.0f),
-		make_float3( 0.0f, 0.0f, 105.0f),
-		prepass_context) );
-	setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
-	lightPos = make_float3( 343.0f, 548.6f, 227.0f);
-
-	// Create geometry group
-	GeometryGroup geometry_group = prepass_context->createGeometryGroup(gis.begin(), gis.end());
-	geometry_group->setAcceleration( prepass_context->createAcceleration( "Trbvh" ) );
-	prepass_context["top_object"]->set( geometry_group );
+    geometry_group->setAcceleration( crtContext->createAcceleration( "Trbvh" ) );
+    crtContext["top_object"]->set( geometry_group );
 }
 
 void setupCamera()
@@ -1156,6 +939,7 @@ void glutMouseMotion( int x, int y)
         const float scale = std::min<float>( dmax, 0.9f );
         //camera_eye = camera_eye + (camera_lookat - camera_eye)*scale;
 		camera_eye = camera_eye + normalize(camera_lookat - camera_eye) * 300.f *scale;
+		camera_lookat = camera_lookat + normalize(camera_lookat - camera_eye) * 300.f *scale;
         camera_changed = true;
     }
     else if( mouse_button == GLUT_LEFT_BUTTON )
@@ -1313,7 +1097,8 @@ int main( int argc, char** argv )
 
 		createPrePassContext();
 		setupPrePassCamera();
-		loadPrePassGeometry();
+		//loadPrePassGeometry();
+		loadGeometry(prepass_context, "photonPrePass.cu");
 		prepass_context->validate();
 		//glutPrePassRun();
 		updatePrePassCamera();
@@ -1328,7 +1113,7 @@ int main( int argc, char** argv )
 
         createContext();
         setupCamera();
-        loadGeometry();
+        loadGeometry(context, "optixPathTracer.cu");
 
         context->validate();
 
