@@ -57,6 +57,7 @@
 #include <stdint.h>
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
+#include <OptiXMesh.h>
 
 using namespace optix;
 
@@ -479,10 +480,20 @@ void loadGeometry()
 	//	make_float3( 0.0f, 330.0f, 0.0f),
 	//	make_float3( 158.0f, 0.0f, -49.0f) ) );
 	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-    // Create shadow group (no light)
-	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
-		context));
-	setMaterial(gis.back(), glass, "diffuse_color", blue);
+
+	//gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
+	//	context));
+	//setMaterial(gis.back(), glass, "diffuse_color", blue);
+
+	OptiXMesh mesh;
+	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
+	mesh.context = context;
+	mesh.material = diffuse;
+
+	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 100.f, 250.f)) * Matrix4x4::scale(make_float3(30.f)));
+	gis.push_back(mesh.geom_instance);
+	setMaterial(gis.back(), diffuse, "diffuse_color", red);
+
 
     GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
     shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
@@ -497,6 +508,7 @@ void loadGeometry()
 
     // Create geometry group
     GeometryGroup geometry_group = context->createGeometryGroup(gis.begin(), gis.end());
+	//geometry_group->addChild(mesh.geom_instance);
     geometry_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
     context["top_object"]->set( geometry_group );
 }
@@ -1066,10 +1078,10 @@ void glutDisplay()
     updateCamera();
     context->launch( 0, width, height );
 
-    sutil::displayBufferGL( getOutputBuffer() );
+    //sutil::displayBufferGL( getOutputBuffer() );
 	
-	//drawPhoton();
-	drawBoundingBox();
+	drawPhoton();
+	//drawBoundingBox();
 	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     {
       static unsigned frame_count = 0;
@@ -1079,6 +1091,8 @@ void glutDisplay()
     glutSwapBuffers();
 	
 }
+
+// deprecated function, never use it
 
 void glutPrePassDisplay()
 {
