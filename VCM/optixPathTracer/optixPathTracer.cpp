@@ -62,7 +62,7 @@ using namespace optix;
 
 const char* const SAMPLE_NAME = "optixPathTracer";
 
-#define MAX_PHOTON 12000000
+#define MAX_PHOTON 20000000
 
 //------------------------------------------------------------------------------
 //
@@ -350,6 +350,12 @@ void loadGeometry()
     Program diffuse_em = context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
     diffuse_light->setClosestHitProgram( 0, diffuse_em );
 
+	Material glass = context->createMaterial();
+	Program glass_ch = context->createProgramFromPTXFile(ptx_path, "glass_closest_hit_radiance");
+	Program glass_ah = context->createProgramFromPTXFile(ptx_path, "shadow");
+	glass->setClosestHitProgram(0, glass_ch);
+	glass->setAnyHitProgram(1, glass_ah);
+
     // Set up parallelogram programs
     ptx_path = ptxPath( "parallelogram.cu" );
     pgram_bounding_box = context->createProgramFromPTXFile( ptx_path, "bounds" );
@@ -476,7 +482,7 @@ void loadGeometry()
     // Create shadow group (no light)
 	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
 		context));
-	setMaterial(gis.back(), specular, "diffuse_color", blue);
+	setMaterial(gis.back(), glass, "diffuse_color", blue);
 
     GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
     shadow_group->setAcceleration( context->createAcceleration( "Trbvh" ) );
@@ -531,6 +537,12 @@ void loadPrePassGeometry()
 	Material diffuse_light = prepass_context->createMaterial();
 	Program diffuse_em = prepass_context->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
 	diffuse_light->setClosestHitProgram( 0, diffuse_em );
+
+	Material glass = prepass_context->createMaterial();
+	Program glass_ch = prepass_context->createProgramFromPTXFile(ptx_path, "glass_closest_hit_radiance");
+	Program glass_ah = prepass_context->createProgramFromPTXFile(ptx_path, "shadow");
+	glass->setClosestHitProgram(0, glass_ch);
+	glass->setAnyHitProgram(1, glass_ah);
 
 	// Set up parallelogram programs
 	ptx_path = ptxPath( "parallelogram.cu" );
@@ -616,7 +628,7 @@ void loadPrePassGeometry()
 
 	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
 		prepass_context));
-	setMaterial(gis.back(), specular, "diffuse_color", blue);
+	setMaterial(gis.back(), glass, "diffuse_color", blue);
 
 	GeometryGroup shadow_group = prepass_context->createGeometryGroup(gis.begin(), gis.end());
 	shadow_group->setAcceleration( prepass_context->createAcceleration( "Trbvh" ) );
@@ -1054,9 +1066,9 @@ void glutDisplay()
     updateCamera();
     context->launch( 0, width, height );
 
-    //sutil::displayBufferGL( getOutputBuffer() );
+    sutil::displayBufferGL( getOutputBuffer() );
 	
-	drawPhoton();
+	//drawPhoton();
 	drawBoundingBox();
 	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     {

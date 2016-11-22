@@ -371,4 +371,52 @@ RT_PROGRAM void miss()
     current_prd.done = true;
 }
 
+RT_PROGRAM void glass_closest_hit_radiance()
+{
+	float n1 = 1.0f, n2 = 1.5f;
+    float3 hitpoint = ray.origin + t_hit * ray.direction;
+	
+	float3 d = normalize(ray.direction);
 
+	float cosTheta = dot(ray.direction, world_normal);
+	float eta = n2 / n1;
+	float3 realNormal;
+
+	if (cosTheta > 0.0f)
+	{
+		realNormal = -world_normal;
+	}
+	else
+	{
+		realNormal = world_normal;
+		//eta = n1 / n2;
+		cosTheta = -cosTheta;
+	}
+
+	unsigned int seed = t_hit * frame_number;
+	float u01 = rnd(seed);
+	//thrust::uniform_real_distribution<float> u01(0, 1);
+	//thrust::default_random_engine rng = makeSeededRandomEngine(frame_number, launch_index.x + launch_index.y, 0);
+
+	if (u01 < (n2 - n1) / (n2 + n1) * (n2 - n1) / (n2 + n1) + (1 - (n2 - n1) / (n2 + n1) * (n2 - n1) / (n2 + n1)) * pow(1 - cosTheta, 5))
+	{
+		current_prd.direction = reflect(ray.direction, realNormal);
+	}
+	else
+	{
+		refract(current_prd.direction, ray.direction, world_normal, eta);
+		//glm::vec3 a(d.x, d.y, d.z);
+		//glm::vec3 b(realNormal.x, realNormal.y, realNormal.z);
+		//glm::vec3 c = glm::refract(a, b, eta);
+		//current_prd.direction = make_float3(c.x, c.y, c.z);
+	}
+
+	current_prd.origin = hitpoint;
+    current_prd.attenuation = current_prd.attenuation;
+    current_prd.countEmitted = true;
+	
+    float3 result = make_float3(0.0f);
+    current_prd.radiance = result;
+	current_prd.tValue = tValue;
+	current_prd.isSpecular = 1;
+}
