@@ -285,7 +285,7 @@ void createPrePassContext()
 	prepass_context[ "bg_color"         ]->setFloat( make_float3(0.0f) );
 }
 
-void createContext()
+void createContext(std::string filename)
 {
     context = Context::create();
     context->setRayTypeCount( 2 );
@@ -301,7 +301,7 @@ void createContext()
     context["output_buffer"]->set( buffer );
 
     // Setup programs
-    const std::string cuda_file = std::string( SAMPLE_NAME ) + ".cu";
+    const std::string cuda_file = filename;
     const std::string ptx_path = ptxPath( cuda_file );
     context->setRayGenerationProgram( 0, context->createProgramFromPTXFile( ptx_path, "pathtrace_camera" ) );
     context->setExceptionProgram( 0, context->createProgramFromPTXFile( ptx_path, "exception" ) );
@@ -943,10 +943,10 @@ int main( int argc, char** argv )
 		}
 		setPhotonGLBuffer();
 #endif
-
-        createContext();
+		std::string contextFileName = "optixPathTracer.cu";
+        createContext(contextFileName);
         setupCamera();
-        loadGeometry(context, "optixPathTracer.cu");
+        loadGeometry(context, contextFileName);
 
         context->validate();
 
