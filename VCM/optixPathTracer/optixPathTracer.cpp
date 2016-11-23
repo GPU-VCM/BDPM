@@ -414,7 +414,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	//gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
 	//	context));
 	//setMaterial(gis.back(), glass, "diffuse_color", blue);
-#define DRAGON
+#define COW
 #ifdef COW
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
@@ -423,14 +423,14 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 
 	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(50.f)));
 	gis.push_back(mesh.geom_instance);
-	setMaterial(gis.back(), glass, "diffuse_color", red);
+	//setMaterial(gis.back(), glass, "diffuse_color", red);
 #endif
 
 #ifdef DRAGON
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/dragon.obj";
 	mesh.context = crtContext;
-	mesh.material = glass;
+//	mesh.material = glass;
 
 	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 100.f, 250.f)) * Matrix4x4::scale(make_float3(40.f)));
 	gis.push_back(mesh.geom_instance);

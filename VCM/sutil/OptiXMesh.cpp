@@ -110,6 +110,7 @@ void createMaterialPrograms(
 {
   const std::string path = std::string( sutil::samplesPTXDir() ) + 
                           "/cuda_compile_ptx_generated_phong.cu.ptx";
+  //const std::string path = "E:/VCM/VCM/build/lib/ptx/cuda_compile_ptx_generated_phong.cu.ptx";
   const std::string closest_name = use_textures ?
                                    "closest_hit_radiance_textured" :
                                    "closest_hit_radiance";
@@ -202,6 +203,16 @@ void translateMeshToOptiX(
             any_hit,
             mesh.mat_params[i],
             have_textures ) );
+
+	//std::string ptx_path("E:/VCM/VCM/build/lib/ptx/optixPathTracer_generated_optixPathTracer.cu.ptx");
+	//optix::Material glass = ctx->createMaterial();
+	//optix::Program glass_ch = ctx->createProgramFromPTXFile(ptx_path, "glass_closest_hit_radiance");
+	//optix::Program glass_ah = ctx->createProgramFromPTXFile(ptx_path, "shadow");
+	//glass->setClosestHitProgram(0, glass_ch);
+	//glass->setAnyHitProgram(1, glass_ah);
+	//memset( mesh.mat_indices, 0, mesh.num_triangles*sizeof(int32_t) );
+
+	//optix_materials.push_back( glass ); 
   }
 
   optix::Geometry geometry = ctx->createGeometry();  
