@@ -943,7 +943,8 @@ int main( int argc, char** argv )
 		}
 		setPhotonGLBuffer();
 #endif
-		std::string contextFileName = "optixPathTracer.cu";
+
+		std::string contextFileName = "photonSecondPass.cu";
         createContext(contextFileName);
         setupCamera();
         loadGeometry(context, contextFileName);

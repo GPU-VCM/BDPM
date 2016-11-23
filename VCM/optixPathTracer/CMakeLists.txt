@@ -42,6 +42,7 @@ if(GLUT_FOUND AND OPENGL_FOUND)
         random.h
 
         photonPrePass.cu
+        photonSecondPass.cu
         )
 else()
     # GLUT or OpenGL not found
