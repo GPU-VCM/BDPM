@@ -51,6 +51,14 @@ struct PerRayData_pathtrace_shadow
     bool inShadow;
 };
 
+// 
+rtBuffer<Photon> photonBuffer;
+rtBuffer<int> gridStartIndexBuffer;
+rtBuffer<int> gridEndIndexBuffer;
+rtDeclareVariable(float,         gridLength, , );
+rtDeclareVariable(float,         gridMin, , );
+rtDeclareVariable(int,         gridSideCount, , );
+
 // Scene wide variables
 rtDeclareVariable(float,         scene_epsilon, , );
 rtDeclareVariable(rtObject,      top_object, , );

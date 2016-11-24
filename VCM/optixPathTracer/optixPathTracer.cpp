@@ -323,6 +323,10 @@ void createContext(std::string filename)
     context[ "sqrt_num_samples" ]->setUint( sqrt_num_samples );
     context[ "bad_color"        ]->setFloat( 1000000.0f, 0.0f, 1000000.0f ); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
     context[ "bg_color"         ]->setFloat( make_float3(0.0f) );
+
+	context[ "gridLength" ]->setFloat(gridLength);
+	context[ "gridMin" ]->setFloat(gridMin);
+	context[ "gridSideCount" ]->setInt(gridSideCount);
 }
 
 
@@ -744,6 +748,30 @@ void setPhotonGLBuffer()
 		}
 	}
 	
+	Buffer gridPhotonBuffer = context->createBuffer( RT_BUFFER_INPUT );
+	gridPhotonBuffer->setFormat( RT_FORMAT_USER );
+	gridPhotonBuffer->setElementSize( sizeof( Photon ) );
+	gridPhotonBuffer->setSize( validPhoton );
+	memcpy(gridPhotonBuffer->map(), secondPassPhoton, sizeof(Photon) * validPhoton);
+	gridPhotonBuffer->unmap();
+	context["photonBuffer"]->setBuffer(gridPhotonBuffer);
+
+	Buffer gridStartIndexBuffer = context->createBuffer( RT_BUFFER_INPUT );
+	gridStartIndexBuffer->setFormat( RT_FORMAT_USER );
+	gridStartIndexBuffer->setElementSize( sizeof( int ) );
+	gridStartIndexBuffer->setSize( validPhoton );
+	memcpy(gridStartIndexBuffer->map(), gridStartIndex, sizeof(int) * validPhoton);
+	gridStartIndexBuffer->unmap();
+	context["gridStartIndexBuffer"]->setBuffer(gridStartIndexBuffer);
+
+	Buffer gridEndIndexBuffer = context->createBuffer( RT_BUFFER_INPUT );
+	gridEndIndexBuffer->setFormat( RT_FORMAT_USER );
+	gridEndIndexBuffer->setElementSize( sizeof( int ) );
+	gridEndIndexBuffer->setSize( validPhoton );
+	memcpy(gridEndIndexBuffer->map(), gridEndIndex, sizeof(int) * validPhoton);
+	gridEndIndexBuffer->unmap();
+	context["gridEndIndexBuffer"]->setBuffer(gridEndIndexBuffer);
+
 	vPhotonGrid.clear();
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
@@ -990,12 +1018,16 @@ int main( int argc, char** argv )
 			prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
 			prepass_context->launch(0, photonSamples, photonSamples);
 		}
-		setPhotonGLBuffer();
 
 		std::string contextFileName = "photonSecondPass.cu";
-        createContext(contextFileName);
-        setupCamera();
-        loadGeometry(context, contextFileName);
+		createContext(contextFileName);
+		setupCamera();
+		loadGeometry(context, contextFileName);
+
+		// photonSecondPass.cu should be created before this function call
+		setPhotonGLBuffer(); 
+
+
 
         context->validate();
 
