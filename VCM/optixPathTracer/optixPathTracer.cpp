@@ -725,12 +725,25 @@ void setPhotonGLBuffer()
 	}
 	std::sort(vPhotonGrid.begin(), vPhotonGrid.end(), cmp);
 
+	memset(gridStartIndex, -1, sizeof(gridStartIndex));
+	memset(gridEndIndex, -1, sizeof(gridEndIndex));
+	gridStartIndex[vPhotonGrid[0].second] = gridEndIndex[vPhotonGrid[0].second] = 0;
 	for (int i = 0; i < validPhoton; i++)
 	{
 		secondPassPhoton[i] = vPhotonGrid[i].first;
 		gridIndexOfPhoton[i] = vPhotonGrid[i].second;
-	}
 
+		if (i == validPhoton - 1)
+		{
+			gridEndIndex[vPhotonGrid[i].second] = i;
+		}
+		else if (vPhotonGrid[i].second != vPhotonGrid[i + 1].second)
+		{
+			gridStartIndex[vPhotonGrid[i + 1].second] = gridEndIndex[vPhotonGrid[i + 1].second] = i;
+			gridEndIndex[vPhotonGrid[i].second] = i;
+		}
+	}
+	
 	vPhotonGrid.clear();
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
