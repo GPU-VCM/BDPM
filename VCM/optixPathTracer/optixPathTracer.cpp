@@ -64,7 +64,7 @@ using namespace optix;
 const char* const SAMPLE_NAME = "optixPathTracer";
 
 #define MAX_PHOTON 20000000
-//#define DRAWPHOTON
+#define DRAWPHOTON
 //------------------------------------------------------------------------------
 //
 // Globals
@@ -115,6 +115,18 @@ const int nPrePassIteration = 30;
 float3 photonPos[MAX_PHOTON];
 float3 photonColor[MAX_PHOTON];
 int validPhoton;
+
+// grid information used for second-pass of photon mapping
+#define MAX_GRID 27000000
+int gridStartIndex[MAX_GRID];
+int gridEndIndex[MAX_GRID];
+int gridIndexOfPhoton[MAX_PHOTON];
+const float gridLength = 4.f;
+const int gridSideCount = 150;
+const float gridSideLength = gridLength * gridSideCount;
+const float gridMin = -10.f;
+std::vector<std::pair<Photon, int>> vPhotonGrid;
+Photon secondPassPhoton[MAX_PHOTON];
 
 //------------------------------------------------------------------------------
 //
@@ -196,6 +208,7 @@ void setMaterial(
         const float3& color)
 {
     gi->addMaterial(material);
+	//printf("Material:%d\n", gi->getMaterialCount());
     gi[color_name]->setFloat(color);
 }
 
@@ -419,11 +432,12 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
 	mesh.context = crtContext;
-	mesh.material = glass;
+	mesh.material = diffuse;
 
 	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(50.f)));
 	gis.push_back(mesh.geom_instance);
-	//setMaterial(gis.back(), glass, "diffuse_color", red);
+	gis.back()["diffuse_color"]->setFloat(red);
+	//setMaterial(gis.back(), diffuse, "diffuse_color", red);
 #endif
 
 #ifdef DRAGON
@@ -670,6 +684,17 @@ void drawBoundingBox()
 
 	glEnd();
 }
+#include <thrust/device_vector.h>
+#include <thrust/host_vector.h>
+#include <thrust/scan.h>
+#include <thrust/execution_policy.h>
+#include <thrust/random.h>
+#include <thrust/remove.h>
+
+bool cmp(const std::pair<Photon, int> &a, const std::pair<Photon, int> &b)
+{
+	return a.second < b.second;
+}
 
 void setPhotonGLBuffer()
 {
@@ -679,23 +704,34 @@ void setPhotonGLBuffer()
 	RT_CHECK_ERROR(rtBufferMap(prepass_context["photonBuffer"]->getBuffer()->get(), &data));
 	Photon *photon = (Photon*)data;
 
-	int nothit=0;
-	validPhoton = 0;
-
-	for (int i = 0; i < nPrePassIteration * 5 * photonSamples * photonSamples; i++)
+	validPhoton = nPrePassIteration * 5 * photonSamples * photonSamples;
+	//printf("Before TotalPhoton:%d\n", nTotalPhoton);
+	thrust::remove_if(photon, photon + validPhoton, isHit, thrust::logical_not<bool>());
+	validPhoton = thrust::count_if(isHit, isHit + validPhoton, thrust::identity<bool>());
+	//printf("After TotalPhoton:%d\n", nTotalPhoton);
+	printf("photon size:%d\n", sizeof(Photon));
+	for (int i = 0; i < validPhoton; i++)
 	{
-		if (isHit[i])
-		{
-			photonPos[validPhoton] = photon[i].position;
-			photonColor[validPhoton] = photon[i].color;
-			validPhoton++;	
-		}
-		else
-		{
-			nothit++;
-		}
+		photonPos[i] = photon[i].position;
+		photonColor[i] = photon[i].color;
+		
+		int gridIndexX = (photon[i].position.x - gridMin) / gridLength;
+		int gridIndexY = (photon[i].position.y - gridMin) / gridLength;
+		int gridIndexZ = (photon[i].position.z - gridMin) / gridLength;
+		//printf("%d %d %d\n", gridIndexX, gridIndexY, gridIndexZ);
+		gridIndexOfPhoton[i] = gridIndexX * gridSideCount * gridSideCount + gridIndexY * gridSideCount + gridIndexZ;
+		std::pair<Photon, int> pair(photon[i], gridIndexOfPhoton[i]);
+		vPhotonGrid.push_back(pair);
+	}
+	std::sort(vPhotonGrid.begin(), vPhotonGrid.end(), cmp);
+
+	for (int i = 0; i < validPhoton; i++)
+	{
+		secondPassPhoton[i] = vPhotonGrid[i].first;
+		gridIndexOfPhoton[i] = vPhotonGrid[i].second;
 	}
 
+	vPhotonGrid.clear();
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
 }
@@ -925,7 +961,7 @@ int main( int argc, char** argv )
         glewInit();
 #endif
 
-#ifdef DRAWPHOTON
+
 		createPrePassContext();
 		setupPrePassCamera();
 		//loadPrePassGeometry();
@@ -942,7 +978,6 @@ int main( int argc, char** argv )
 			prepass_context->launch(0, photonSamples, photonSamples);
 		}
 		setPhotonGLBuffer();
-#endif
 
 		std::string contextFileName = "photonSecondPass.cu";
         createContext(contextFileName);

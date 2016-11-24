@@ -200,7 +200,6 @@ rtDeclareVariable(float3,     shading_normal,   attribute shading_normal, );
 rtDeclareVariable(optix::Ray, ray,              rtCurrentRay, );
 rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
-
 RT_PROGRAM void diffuse()
 {
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
@@ -210,6 +209,7 @@ RT_PROGRAM void diffuse()
     float3 ffnormal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
 
     float3 hitpoint = ray.origin + t_hit * ray.direction;
+
 
     //
     // Generate a reflection ray.  This will be traced back in ray-gen.

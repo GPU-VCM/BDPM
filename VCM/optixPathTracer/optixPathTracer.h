@@ -42,4 +42,23 @@ struct Photon
 {
 	optix::float3 position;
 	optix::float3 color;
+
+	Photon(){}
+
+	Photon(const Photon &p)
+	{
+		position = p.position;
+		color = p.color;
+	}
+	bool operator()(const Photon &a, const Photon &b) const
+	{
+		return a.position.x < b.position.x;
+	}
+	bool operator<(const Photon &b) const
+	{
+		return position.x < b.position.x;
+	}
+	//int nGridIndex;
 };
+
+
