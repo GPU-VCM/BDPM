@@ -58,6 +58,7 @@ rtBuffer<int> gridEndIndexBuffer;
 rtDeclareVariable(float,         gridLength, , );
 rtDeclareVariable(float,         gridMin, , );
 rtDeclareVariable(int,         gridSideCount, , );
+rtDeclareVariable(int,         totalPhotons, , );
 
 // Scene wide variables
 rtDeclareVariable(float,         scene_epsilon, , );
@@ -218,7 +219,11 @@ RT_PROGRAM void diffuse()
 
     float3 hitpoint = ray.origin + t_hit * ray.direction;
 
-
+	//printf("%f\n", photonBuffer[totalPhotons - 1].position.x);
+	//for (int i = 0; i < 100; i++)
+	//{
+	//	printf("%f %f %f\n", photonBuffer[i].position.x,  photonBuffer[i].position.y, photonBuffer[i].position.z);
+	//}
     //
     // Generate a reflection ray.  This will be traced back in ray-gen.
     //
