@@ -348,7 +348,7 @@ rtDeclareVariable(PerRayData_pathtrace_shadow, current_prd_shadow, rtPayload, );
 RT_PROGRAM void shadow()
 {
     current_prd_shadow.inShadow = true;
-    rtTerminateRay();
+    //rtTerminateRay();
 }
 
 

@@ -7,6 +7,8 @@ rtDeclareVariable(float, radius, , );
 //rtDeclareVariable(int, lgt_instance, , ) = {0};
 
 rtDeclareVariable(float3, world_normal, attribute world_normal, ); 
+rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, ); 
+rtDeclareVariable(float3, shading_normal, attribute shading_normal, ); 
 //rtDeclareVariable(int, lgt_idx, attribute lgt_idx, ); 
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 rtDeclareVariable(float, tValue, attribute tValue, );
@@ -27,7 +29,7 @@ RT_PROGRAM void intersect(int primIdx)
 		{
 			float3 p = ray.origin + t * ray.direction;
 			//printf("Intersected:%f %f %f\n", p.x, p.y, p.z);
-			world_normal = normalize(ray.origin + t * ray.direction - center);
+			geometric_normal = shading_normal = world_normal = normalize(ray.origin + t * ray.direction - center);
 			tValue = t;
 			rtReportIntersection( 0 );
         }

@@ -261,15 +261,48 @@ RT_PROGRAM void diffuse()
 				}
 				
 			}
+
+	//unsigned int num_lights = lights.size();
+ //   float3 result = make_float3(0.0f);
+	////result = diffuse_color;
+ //   for(int i = 0; i < num_lights; ++i)
+ //   {
+ //       // Choose random point on light
+ //       ParallelogramLight light = lights[i];
+ //       const float z1 = rnd(current_prd.seed);
+ //       const float z2 = rnd(current_prd.seed);
+ //       const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
+
+ //       // Calculate properties of light sample (for area based pdf)
+ //       const float  Ldist = length(light_pos - hitpoint);
+ //       const float3 L     = normalize(light_pos - hitpoint);
+ //       const float  nDl   = dot( ffnormal, L );
+ //       const float  LnDl  = dot( light.normal, L );
+
+ //       // cast shadow ray
+ //       if ( nDl > 0.0f && LnDl > 0.0f )
+ //       {
+ //           PerRayData_pathtrace_shadow shadow_prd;
+ //           shadow_prd.inShadow = false;
+ //           // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
+ //           Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
+ //           rtTrace(top_object, shadow_ray, shadow_prd);
+
+ //           if(!shadow_prd.inShadow)
+ //           {
+ //               result = make_float3(1.0f);
+ //           }
+ //       }
+ //   }
 	//printf("%f %f %f\n", current_prd.attenuation.x, current_prd.attenuation.y, current_prd.attenuation.z);
 	//current_prd.attenuation = make_float3(1.0f, 0.0f, 0.0f);
-
-	current_prd.attenuation = averageColor / counter;
+	/*float density = counter / (radius * radius);*/
+	float scale = 5.f;
+	current_prd.attenuation = averageColor / (scale * radius * radius);
 	current_prd.done = true;
     current_prd.countEmitted = false;
-    unsigned int num_lights = lights.size();
-    current_prd.radiance = make_float3(1.0f);
-	
+    //current_prd.radiance = result;
+	current_prd.radiance = make_float3(1.0f);
 	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 

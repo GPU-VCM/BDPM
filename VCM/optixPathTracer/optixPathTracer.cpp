@@ -64,7 +64,8 @@ using namespace optix;
 const char* const SAMPLE_NAME = "optixPathTracer";
 
 #define MAX_PHOTON 20000000
-#define DRAWPHOTON
+//#define DRAWPHOTON
+const std::string contextFileName = "photonSecondPass.cu";
 //------------------------------------------------------------------------------
 //
 // Globals
@@ -121,8 +122,8 @@ int validPhoton;
 int gridStartIndex[MAX_GRID];
 int gridEndIndex[MAX_GRID];
 int gridIndexOfPhoton[MAX_PHOTON];
-const float gridLength = 10.f;
-const int gridSideCount = 60;
+const float gridLength = 600.f;
+const int gridSideCount = 1;
 const float gridSideLength = gridLength * gridSideCount;
 const float gridMin = -10.f;
 std::vector<std::pair<Photon, int>> vPhotonGrid;
@@ -363,6 +364,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
     Material diffuse_light = crtContext->createMaterial();
     Program diffuse_em = crtContext->createProgramFromPTXFile( ptx_path, "diffuseEmitter" );
     diffuse_light->setClosestHitProgram( 0, diffuse_em );
+	// light doesn't have any-hit program so the shadow ray won't intersect with light
 
 	Material glass = crtContext->createMaterial();
 	Program glass_ch = crtContext->createProgramFromPTXFile(ptx_path, "glass_closest_hit_radiance");
@@ -424,10 +426,15 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 										crtContext ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", red);
 
-	//gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
-	//	context));
-	//setMaterial(gis.back(), glass, "diffuse_color", blue);
-#define COW
+
+#define SPHERE
+
+#ifdef SPHERE
+	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
+		crtContext));
+	setMaterial(gis.back(), diffuse, "diffuse_color", blue);
+#endif
+
 #ifdef COW
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
@@ -1039,14 +1046,13 @@ int main( int argc, char** argv )
 			prepass_context->launch(0, photonSamples, photonSamples);
 		}
 
-		std::string contextFileName = "photonSecondPass.cu";
 		createContext(contextFileName);
 		setupCamera();
 		loadGeometry(context, contextFileName);
 
 		// photonSecondPass.cu should be created before this function call
 		setPhotonGLBuffer(); 
-
+		prepass_context->destroy();
 
 
         context->validate();

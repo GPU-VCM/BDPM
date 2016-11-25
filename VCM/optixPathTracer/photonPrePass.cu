@@ -328,6 +328,7 @@ RT_PROGRAM void specular()
 	current_prd.radiance = result;
 	current_prd.tValue = tValue;
 	current_prd.isSpecular = 1;
+	//printf("SPECULAR\n");
  //   float3 result = make_float3(0.0f);
  //   current_prd.radiance = result;
 	//current_prd.done = 1;
