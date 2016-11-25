@@ -294,6 +294,9 @@ RT_PROGRAM void diffuse()
             Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
             rtTrace(top_object, shadow_ray, shadow_prd);
 
+			// do not calculate shadow in pre-pass, calculate in the second-pass
+
+
             if(!shadow_prd.inShadow)
             {
                 const float A = length(cross(light.v1, light.v2));

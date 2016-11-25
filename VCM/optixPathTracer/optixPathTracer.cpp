@@ -121,8 +121,8 @@ int validPhoton;
 int gridStartIndex[MAX_GRID];
 int gridEndIndex[MAX_GRID];
 int gridIndexOfPhoton[MAX_PHOTON];
-const float gridLength = 4.f;
-const int gridSideCount = 150;
+const float gridLength = 10.f;
+const int gridSideCount = 60;
 const float gridSideLength = gridLength * gridSideCount;
 const float gridMin = -10.f;
 std::vector<std::pair<Photon, int>> vPhotonGrid;
@@ -710,11 +710,13 @@ void setPhotonGLBuffer()
 	validPhoton = thrust::count_if(isHit, isHit + validPhoton, thrust::identity<bool>());
 	//printf("After TotalPhoton:%d\n", nTotalPhoton);
 	printf("photon size:%d\n", sizeof(Photon));
+	//FILE *fp1 = fopen("test1.txt", "w");
 	for (int i = 0; i < validPhoton; i++)
 	{
 		photonPos[i] = photon[i].position;
 		photonColor[i] = photon[i].color;
 		
+		//fprintf(fp1, "%f %f %f\n", photonColor[i].x, photonColor[i].y, photonColor[i].z);
 		int gridIndexX = (photon[i].position.x - gridMin) / gridLength;
 		int gridIndexY = (photon[i].position.y - gridMin) / gridLength;
 		int gridIndexZ = (photon[i].position.z - gridMin) / gridLength;
@@ -723,6 +725,7 @@ void setPhotonGLBuffer()
 		std::pair<Photon, int> pair(photon[i], gridIndexOfPhoton[i]);
 		vPhotonGrid.push_back(pair);
 	}
+	//fclose(fp1);
 	std::sort(vPhotonGrid.begin(), vPhotonGrid.end(), cmp);
 
 	memset(gridStartIndex, -1, sizeof(gridStartIndex));
@@ -772,6 +775,22 @@ void setPhotonGLBuffer()
 	context[ "gridMin" ]->setFloat(gridMin);
 	context[ "gridSideCount" ]->setInt(gridSideCount);
 	context[ "totalPhotons" ]->setInt(validPhoton);
+
+	//FILE *fp = fopen("test.txt", "w");
+	//for (int i = 0; i < gridSideCount * gridSideCount * gridSideCount; i++)
+	//{
+
+	//	fprintf(fp, "s:%d e:%d\n", gridStartIndex[i], gridEndIndex[i]);
+	//	fprintf(fp, "x:%d y:%d z:%d\n", i / (gridSideCount * gridSideCount) , i % (gridSideCount * gridSideCount) / gridSideCount, i % (gridSideCount * gridSideCount) % gridSideCount);
+	//	if (gridStartIndex[i] == -1 && gridEndIndex[i] == -1)
+	//		continue;
+	//	for (int j = gridStartIndex[i]; j <= gridEndIndex[i]; j++)
+	//	{
+	//		fprintf(fp, "c:%f %f %f\n", secondPassPhoton[j].color.x, secondPassPhoton[j].color.y, secondPassPhoton[j].color.z);
+	//		fprintf(fp, "p:%f %f %f\n", secondPassPhoton[j].position.x, secondPassPhoton[j].position.y, secondPassPhoton[j].position.z);
+	//	}
+	//}
+	//fclose(fp);
 
 	vPhotonGrid.clear();
 	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
