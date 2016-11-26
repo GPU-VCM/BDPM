@@ -64,7 +64,7 @@ using namespace optix;
 const char* const SAMPLE_NAME = "optixPathTracer";
 
 #define MAX_PHOTON 20000000
-#define DRAWPHOTON
+//#define DRAWPHOTON
 const std::string contextFileName = "photonSecondPass.cu";
 //const std::string contextFileName = "optixPathTracer.cu";
 //------------------------------------------------------------------------------
@@ -111,8 +111,8 @@ std::vector<Buffer> vAabbBuffer;
 Context	prepass_context = 0;
 float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
-int photonSamples = 600; // number of samples in 360 degrees
-const int nPrePassIteration = 50;
+int photonSamples = 100; // number of samples in 360 degrees
+const int nPrePassIteration = 1000;
 
 std::vector<float3> photonPos;
 std::vector<float3> photonColor;
@@ -300,6 +300,7 @@ void createPrePassContext()
 	prepass_context[ "sqrt_num_samples" ]->setUint( sqrt_num_samples );
 	prepass_context[ "bad_color"        ]->setFloat( 1000000.0f, 0.0f, 1000000.0f ); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
 	prepass_context[ "bg_color"         ]->setFloat( make_float3(0.0f) );
+	prepass_context[ "row"]->setInt((int)(sqrt(nPrePassIteration + 1) + 0.5f));
 }
 
 void createContext(std::string filename)
@@ -436,7 +437,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 #ifdef SPHERE
 	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
 		crtContext));
-	setMaterial(gis.back(), specular, "diffuse_color", blue);
+	setMaterial(gis.back(), glass, "diffuse_color", blue);
 #endif
 
 #ifdef COW

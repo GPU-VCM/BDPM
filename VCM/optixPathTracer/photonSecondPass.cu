@@ -290,7 +290,7 @@ RT_PROGRAM void diffuse()
 	//printf("%f %f %f\n", current_prd.attenuation.x, current_prd.attenuation.y, current_prd.attenuation.z);
 	//current_prd.attenuation = make_float3(1.0f, 0.0f, 0.0f);
 	/*float density = counter / (radius * radius);*/
-	float scale = 10.f;
+	float scale = 5.f;
 	current_prd.attenuation = averageColor / (scale * radius * radius);
 	current_prd.done = true;
     current_prd.countEmitted = false;

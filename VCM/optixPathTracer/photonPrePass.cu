@@ -79,6 +79,7 @@ rtDeclareVariable(unsigned int,  sqrt_num_samples, , );
 rtDeclareVariable(unsigned int,  rr_begin_depth, , );
 rtDeclareVariable(unsigned int,  pathtrace_ray_type, , );
 rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
+rtDeclareVariable(int,  row, , );
 
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
@@ -86,7 +87,7 @@ rtBuffer<ParallelogramLight>     lights;
 rtBuffer<Photon>	photonBuffer;
 rtBuffer<int>	isHitBuffer;
 
-#define DECRESE_FACTOR 0.5
+#define DECRESE_FACTOR 0.3
 
 RT_PROGRAM void pathtrace_camera()
 {
@@ -109,15 +110,21 @@ RT_PROGRAM void pathtrace_camera()
 	//printf("%f %f %f\n", dir.x, dir.y, dir.z);
 	//float r = sqrt(1.0f - u1u2.x * u1u2.x);
 	float phi = 2 * M_PI * u1u2.y;
-	float theta = M_PI * u1u2.x;
+	float theta = M_PI * 0.5f * u1u2.x;
 	float r = sin(theta);
-	float3 dir = make_float3(r * cos(phi), cos(theta), r * sin(phi));
+	float3 dir = make_float3(r * cos(phi), -cos(theta), r * sin(phi));
 	//printf("%f %f %f\n", dir.x, dir.y, dir.z);
+	
+	int xx = frame_number / row;
+	int yy = frame_number % row;
+	float d = 1.f / (row - 1);
 
 	ParallelogramLight light = lights[0];
 	const float z1 = rnd(seed);
 	const float z2 = rnd(seed);
-	const float3 light_pos = light.corner + light.v1 * 0.5f + light.v2 * 0.5f;
+	const float3 light_pos = light.corner + light.v1 * d * xx + light.v2 * d * yy;
+	//const float3 light_pos = light.corner + light.v1 * 0.5f + light.v2 * 0.5f;
+	//printf("%d %f %f\n",row,  d * xx, d * yy);
 	//printf("%f %f %f\n", light_pos.x, light_pos.y, light_pos.z);
 
     float3 ray_origin = light_pos;
@@ -131,7 +138,7 @@ RT_PROGRAM void pathtrace_camera()
     PerRayData_pathtrace prd;
     prd.result = make_float3(0.f);
     prd.attenuation = make_float3(1.f);
-	prd.radiance = make_float3(0.1f);
+	prd.radiance = make_float3(0.15f, 0.15f, 0.05f);
     prd.countEmitted = true;
     prd.done = false;
 	prd.seed = seed;
