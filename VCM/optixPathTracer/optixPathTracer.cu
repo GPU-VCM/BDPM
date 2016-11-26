@@ -102,6 +102,7 @@ RT_PROGRAM void pathtrace_camera()
         //
         unsigned int x = samples_per_pixel%sqrt_num_samples;
         unsigned int y = samples_per_pixel/sqrt_num_samples;
+		//printf("%d %d\n", x, y);
 		//if (launch_index.x==1 && launch_index.y==1)
 		//	printf("sample:%d\n",counter++);
         float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
@@ -122,6 +123,8 @@ RT_PROGRAM void pathtrace_camera()
         // return new segments to be traced here.
         for(;;)
         {
+			if (prd.depth > 8)
+				break;
             Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
             rtTrace(top_object, ray, prd);
 
@@ -389,13 +392,16 @@ RT_PROGRAM void glass_closest_hit_radiance()
 	float cosTheta = dot(ray.direction, world_normal);
 	float eta = n2 / n1;
 	float3 realNormal;
+	int flag;
 
 	if (cosTheta > 0.0f)
 	{
+		flag = 1;
 		realNormal = -world_normal;
 	}
 	else
 	{
+		flag = 0;
 		realNormal = world_normal;
 		//eta = n1 / n2;
 		cosTheta = -cosTheta;
@@ -409,6 +415,8 @@ RT_PROGRAM void glass_closest_hit_radiance()
 	if (u01 < (n2 - n1) / (n2 + n1) * (n2 - n1) / (n2 + n1) + (1 - (n2 - n1) / (n2 + n1) * (n2 - n1) / (n2 + n1)) * pow(1 - cosTheta, 5))
 	{
 		current_prd.direction = reflect(ray.direction, realNormal);
+		//if (!flag) // avoid bouncing in the glass sphere
+			//current_prd.done = true;
 	}
 	else
 	{

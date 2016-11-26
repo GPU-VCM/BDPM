@@ -80,6 +80,7 @@ rtDeclareVariable(unsigned int,  rr_begin_depth, , );
 rtDeclareVariable(unsigned int,  pathtrace_ray_type, , );
 rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 rtDeclareVariable(int,  row, , );
+rtDeclareVariable(int,  maxDepth, , );
 
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
@@ -145,7 +146,6 @@ RT_PROGRAM void pathtrace_camera()
     prd.depth = 0;
 	prd.isSpecular = 0;
 
-	int maxDepth = 5;
 	for (int i = 0; i < maxDepth; i++)
 		isHitBuffer[maxDepth * index + i] = 0;
     // Each iteration is a segment of the ray path.  The closest hit will
@@ -413,12 +413,14 @@ RT_PROGRAM void glass_closest_hit_radiance()
 	if (cosTheta > 0.0f)
 	{
 		realNormal = -world_normal;
+		//printf("Inside\n");
 	}
 	else
 	{
 		realNormal = world_normal;
 		//eta = n1 / n2;
 		cosTheta = -cosTheta;
+		//printf("OUTSIDE\n");
 	}
 
 	unsigned int seed = t_hit * frame_number;

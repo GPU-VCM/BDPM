@@ -24,6 +24,11 @@ RT_PROGRAM void intersect(int primIdx)
 	{
 		
 		float t = fminf(-dv + sqrt(temp), -dv - sqrt(temp));
+		if (t < 0)
+		{
+			t = fmaxf(-dv + sqrt(temp), -dv - sqrt(temp));
+			//printf("%f\n", t);
+		}
 		//float3 end = ray.origin + t * ray.direction;(length(end - center) - radius)<0.01f &&
 		if(rtPotentialIntersection(t)) 
 		{

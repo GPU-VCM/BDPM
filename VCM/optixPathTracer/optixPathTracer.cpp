@@ -113,6 +113,7 @@ float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 100; // number of samples in 360 degrees
 const int nPrePassIteration = 1000;
+const int maxDepth = 3;
 
 std::vector<float3> photonPos;
 std::vector<float3> photonColor;
@@ -285,9 +286,9 @@ void createPrePassContext()
 	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT);
 	photonBuffer->setFormat( RT_FORMAT_USER );
 	photonBuffer->setElementSize( sizeof( Photon ) );
-	photonBuffer->setSize(5 * photonSamples * photonSamples );
+	photonBuffer->setSize(maxDepth * photonSamples * photonSamples );
 	prepass_context["photonBuffer"]->set(photonBuffer);
-	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, 5 * photonSamples * photonSamples);
+	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, maxDepth * photonSamples * photonSamples);
 	prepass_context["isHitBuffer"]->set(isHitBuffer);
 
 	// Setup programs
@@ -301,6 +302,7 @@ void createPrePassContext()
 	prepass_context[ "bad_color"        ]->setFloat( 1000000.0f, 0.0f, 1000000.0f ); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
 	prepass_context[ "bg_color"         ]->setFloat( make_float3(0.0f) );
 	prepass_context[ "row"]->setInt((int)(sqrt(nPrePassIteration + 1) + 0.5f));
+	prepass_context[ "maxDepth"]->setInt(maxDepth);
 }
 
 void createContext(std::string filename)
@@ -716,7 +718,7 @@ void getPrePassPhotonBuffer()
 	RT_CHECK_ERROR(rtBufferMap(prepass_context["photonBuffer"]->getBuffer()->get(), &data));
 	Photon *photon = (Photon*)data;
 
-	validPhoton = 5 * photonSamples * photonSamples;
+	validPhoton = maxDepth * photonSamples * photonSamples;
 	//printf("Before TotalPhoton:%d\n", nTotalPhoton);
 	thrust::remove_if(photon, photon + validPhoton, isHit, thrust::logical_not<bool>());
 	validPhoton = thrust::count_if(isHit, isHit + validPhoton, thrust::identity<bool>());
