@@ -105,15 +105,8 @@ RT_PROGRAM void pathtrace_camera()
 	//int counter=0;
     {
 		
-        //
-        // Sample pixel using jittering
-        //
-        unsigned int x = samples_per_pixel%sqrt_num_samples;
-        unsigned int y = samples_per_pixel/sqrt_num_samples;
-		//if (launch_index.x==1 && launch_index.y==1)
-		//	printf("sample:%d\n",counter++);
-        float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
-        float2 d = pixel + jitter*jitter_scale;
+        //float2 d = pixel + jitter*jitter_scale;
+		float2 d = pixel;
         float3 ray_origin = eye;
         float3 ray_direction = normalize(d.x*U + d.y*V + W);
 
@@ -297,7 +290,7 @@ RT_PROGRAM void diffuse()
 	//printf("%f %f %f\n", current_prd.attenuation.x, current_prd.attenuation.y, current_prd.attenuation.z);
 	//current_prd.attenuation = make_float3(1.0f, 0.0f, 0.0f);
 	/*float density = counter / (radius * radius);*/
-	float scale = 5.f;
+	float scale = 10.f;
 	current_prd.attenuation = averageColor / (scale * radius * radius);
 	current_prd.done = true;
     current_prd.countEmitted = false;

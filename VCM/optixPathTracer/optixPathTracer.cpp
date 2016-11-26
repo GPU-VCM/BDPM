@@ -66,6 +66,7 @@ const char* const SAMPLE_NAME = "optixPathTracer";
 #define MAX_PHOTON 20000000
 //#define DRAWPHOTON
 const std::string contextFileName = "photonSecondPass.cu";
+//const std::string contextFileName = "optixPathTracer.cu";
 //------------------------------------------------------------------------------
 //
 // Globals
@@ -122,8 +123,8 @@ int validPhoton;
 int gridStartIndex[MAX_GRID];
 int gridEndIndex[MAX_GRID];
 int gridIndexOfPhoton[MAX_PHOTON];
-const float gridLength = 600.f;
-const int gridSideCount = 1;
+const float gridLength = 30.f;
+const int gridSideCount = 20;
 const float gridSideLength = gridLength * gridSideCount;
 const float gridMin = -10.f;
 std::vector<std::pair<Photon, int>> vPhotonGrid;
@@ -390,6 +391,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
     const float3 light_em = make_float3( 15.0f, 15.0f, 5.0f );
 	const float3 gray = make_float3(0.5f, 0.5f, 0.5f);
 	const float3 blue = make_float3(0.05f, 0.05f, 0.8f);
+	const float3 yellow = make_float3(0.8f, 0.8f, 0.05f);
 
     // Floor
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
@@ -410,7 +412,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
                                         make_float3( 0.0f, 548.8f, 0.0f),
 										make_float3( 556.0f, 0.0f, 0.0f),
 										crtContext ) );
-    setMaterial(gis.back(), diffuse, "diffuse_color", gray);
+    setMaterial(gis.back(), diffuse, "diffuse_color", yellow);
 
     // Right wall
     gis.push_back( createParallelogram( make_float3( 0.0f, 0.0f, 0.0f ),
@@ -432,7 +434,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 #ifdef SPHERE
 	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
 		crtContext));
-	setMaterial(gis.back(), diffuse, "diffuse_color", blue);
+	setMaterial(gis.back(), glass, "diffuse_color", blue);
 #endif
 
 #ifdef COW
@@ -451,11 +453,11 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/dragon.obj";
 	mesh.context = crtContext;
-//	mesh.material = glass;
+	mesh.material = glass;
 
-	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 100.f, 250.f)) * Matrix4x4::scale(make_float3(40.f)));
+	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(270.f, 100.f, 360.f)) * Matrix4x4::scale(make_float3(35.f)));
 	gis.push_back(mesh.geom_instance);
-	setMaterial(gis.back(), glass, "diffuse_color", red);
+	gis.back()["diffuse_color"]->setFloat(red);
 #endif
 
     GeometryGroup shadow_group = crtContext->createGeometryGroup(gis.begin(), gis.end());
@@ -463,11 +465,11 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
     crtContext["top_shadower"]->set( shadow_group );
 
     // Light
-    gis.push_back( createParallelogram( make_float3( 343.0f, 548.6f, 227.0f),
-                                        make_float3( -130.0f, 0.0f, 0.0f),
-                                        make_float3( 0.0f, 0.0f, 105.0f),
-										crtContext) );
-    setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
+	gis.push_back( createParallelogram( make_float3( 343.0f, 548.6f, 227.0f),
+		make_float3( -130.0f, 0.0f, 0.0f),
+		make_float3( 0.0f, 0.0f, 105.0f),
+		crtContext) );
+	setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
 
     // Create geometry group
     GeometryGroup geometry_group = crtContext->createGeometryGroup(gis.begin(), gis.end());

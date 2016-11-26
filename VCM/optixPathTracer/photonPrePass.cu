@@ -86,6 +86,7 @@ rtBuffer<ParallelogramLight>     lights;
 rtBuffer<float3>	photonBuffer;
 rtBuffer<int>	isHitBuffer;
 
+#define DECRESE_FACTOR 0.5
 
 RT_PROGRAM void pathtrace_camera()
 {
@@ -112,7 +113,14 @@ RT_PROGRAM void pathtrace_camera()
 	float r = sin(theta);
 	float3 dir = make_float3(r * cos(phi), cos(theta), r * sin(phi));
 	//printf("%f %f %f\n", dir.x, dir.y, dir.z);
-    float3 ray_origin = eye;
+
+	ParallelogramLight light = lights[0];
+	const float z1 = rnd(seed);
+	const float z2 = rnd(seed);
+	const float3 light_pos = light.corner + light.v1 * 0.5f + light.v2 * 0.5f;
+	//printf("%f %f %f\n", light_pos.x, light_pos.y, light_pos.z);
+
+    float3 ray_origin = light_pos;
     float3 ray_direction = dir;
 	
 
@@ -123,6 +131,7 @@ RT_PROGRAM void pathtrace_camera()
     PerRayData_pathtrace prd;
     prd.result = make_float3(0.f);
     prd.attenuation = make_float3(1.f);
+	prd.radiance = make_float3(0.1f);
     prd.countEmitted = true;
     prd.done = false;
 	prd.seed = seed;
@@ -138,6 +147,7 @@ RT_PROGRAM void pathtrace_camera()
     {
 		if (prd.depth >= maxDepth)
 			break;
+		prd.isSpecular = 0;
         Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
         rtTrace(top_object, ray, prd);
 
@@ -220,6 +230,7 @@ RT_PROGRAM void diffuseEmitter()
 {
     current_prd.radiance = current_prd.countEmitted ? emission_color : make_float3(0.f);
     current_prd.done = true;
+	//printf("IN\n");
 }
 
 
@@ -268,46 +279,51 @@ RT_PROGRAM void diffuse()
     //
     // Next event estimation (compute direct lighting).
     //
-    unsigned int num_lights = lights.size();
-    float3 result = make_float3(0.0f);
-	//result = diffuse_color;
-    for(int i = 0; i < num_lights; ++i)
-    {
-        // Choose random point on light
-        ParallelogramLight light = lights[i];
-        const float z1 = rnd(current_prd.seed);
-        const float z2 = rnd(current_prd.seed);
-        const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
+   // unsigned int num_lights = lights.size();
+   // float3 result = make_float3(0.0f);
+   // for(int i = 0; i < num_lights; ++i)
+   // {
+   //     // Choose random point on light
+   //     ParallelogramLight light = lights[i];
+   //     const float z1 = rnd(current_prd.seed);
+   //     const float z2 = rnd(current_prd.seed);
+   //     const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
 
-        // Calculate properties of light sample (for area based pdf)
-        const float  Ldist = length(light_pos - hitpoint);
-        const float3 L     = normalize(light_pos - hitpoint);
-        const float  nDl   = dot( ffnormal, L );
-        const float  LnDl  = dot( light.normal, L );
+   //     // Calculate properties of light sample (for area based pdf)
+   //     const float  Ldist = length(light_pos - hitpoint);
+   //     const float3 L     = normalize(light_pos - hitpoint);
+   //     const float  nDl   = dot( ffnormal, L );
+   //     const float  LnDl  = dot( light.normal, L );
 
-        // cast shadow ray
-        if ( nDl > 0.0f && LnDl > 0.0f )
-        {
-            PerRayData_pathtrace_shadow shadow_prd;
-            shadow_prd.inShadow = false;
-            // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
-            Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
-            rtTrace(top_object, shadow_ray, shadow_prd);
+   //     // cast shadow ray
+   //     if ( nDl > 0.0f && LnDl > 0.0f )
+   //     {
+   //         PerRayData_pathtrace_shadow shadow_prd;
+   //         shadow_prd.inShadow = false;
+   //         // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
+   //         Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
+   //         rtTrace(top_object, shadow_ray, shadow_prd);
 
-			// do not calculate shadow in pre-pass, calculate in the second-pass
+			//// do not calculate shadow in pre-pass, calculate in the second-pass
 
 
-            if(!shadow_prd.inShadow)
-            {
-                const float A = length(cross(light.v1, light.v2));
-                // convert area based pdf to solid angle
-                const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-                result += light.emission * weight;
-            }
-        }
-    }
+   //         if(!shadow_prd.inShadow)
+   //         {
+   //             const float A = length(cross(light.v1, light.v2));
+   //             // convert area based pdf to solid angle
+   //             const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
+   //             result += light.emission * weight;
+   //         }
+			////else
+			////{
+			////	current_prd.attenuation = result = make_float3(1.0f);
+			////}
 
-    current_prd.radiance = result;
+   //     }
+   // }
+
+    //current_prd.radiance = result;
+	current_prd.radiance *= DECRESE_FACTOR;
 	current_prd.tValue = tValue;
 	
 	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
@@ -325,7 +341,8 @@ RT_PROGRAM void specular()
 	current_prd.countEmitted = true;
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
-	current_prd.radiance = result;
+	//current_prd.radiance = result;
+	current_prd.radiance = current_prd.radiance;
 	current_prd.tValue = tValue;
 	current_prd.isSpecular = 1;
 	//printf("SPECULAR\n");
@@ -420,7 +437,8 @@ RT_PROGRAM void glass_closest_hit_radiance()
     current_prd.countEmitted = true;
 	
     float3 result = make_float3(0.0f);
-    current_prd.radiance = result;
+    //current_prd.radiance = result;
+	current_prd.radiance *= DECRESE_FACTOR;
 	current_prd.tValue = tValue;
 	current_prd.isSpecular = 1;
 }
