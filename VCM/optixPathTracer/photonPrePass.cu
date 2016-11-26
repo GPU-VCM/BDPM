@@ -83,7 +83,7 @@ rtDeclareVariable(unsigned int,  pathtrace_shadow_ray_type, , );
 rtBuffer<float4, 2>              output_buffer;
 rtBuffer<ParallelogramLight>     lights;
 
-rtBuffer<float3>	photonBuffer;
+rtBuffer<Photon>	photonBuffer;
 rtBuffer<int>	isHitBuffer;
 
 #define DECRESE_FACTOR 0.5
@@ -91,7 +91,7 @@ rtBuffer<int>	isHitBuffer;
 RT_PROGRAM void pathtrace_camera()
 {
     size_t2 screen = output_buffer.size();
-	int offset = frame_number * screen.x * screen.y * 5;
+	//int offset = frame_number * screen.x * screen.y * 5;
 	//printf("%d\n", offset);
 	unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
     //float2 u1u2 = make_float2(launch_index) / make_float2(screen);
@@ -140,7 +140,7 @@ RT_PROGRAM void pathtrace_camera()
 
 	int maxDepth = 5;
 	for (int i = 0; i < maxDepth; i++)
-		isHitBuffer[offset + maxDepth * index + i] = 0;
+		isHitBuffer[maxDepth * index + i] = 0;
     // Each iteration is a segment of the ray path.  The closest hit will
     // return new segments to be traced here.
     for(;;)
@@ -174,11 +174,11 @@ RT_PROGRAM void pathtrace_camera()
 
 		prd.result += prd.radiance * prd.attenuation;
 		if (!prd.isSpecular)
-			isHitBuffer[offset + maxDepth * index + prd.depth] = 1;
+			isHitBuffer[maxDepth * index + prd.depth] = 1;
 
 		// Be careful of calculating the indices!
-		photonBuffer[offset * 2 + maxDepth * index * 2 + prd.depth * 2] = ray.origin + prd.tValue * ray.direction;
-		photonBuffer[offset * 2 + maxDepth * index * 2 + prd.depth * 2 + 1] = prd.result;
+		photonBuffer[maxDepth * index + prd.depth].position = ray.origin + prd.tValue * ray.direction;
+		photonBuffer[maxDepth * index + prd.depth].color = prd.result;
         prd.depth++;
         
 

@@ -64,7 +64,7 @@ using namespace optix;
 const char* const SAMPLE_NAME = "optixPathTracer";
 
 #define MAX_PHOTON 20000000
-//#define DRAWPHOTON
+#define DRAWPHOTON
 const std::string contextFileName = "photonSecondPass.cu";
 //const std::string contextFileName = "optixPathTracer.cu";
 //------------------------------------------------------------------------------
@@ -112,23 +112,22 @@ Context	prepass_context = 0;
 float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 600; // number of samples in 360 degrees
-const int nPrePassIteration = 30;
+const int nPrePassIteration = 50;
 
-float3 photonPos[MAX_PHOTON];
-float3 photonColor[MAX_PHOTON];
+std::vector<float3> photonPos;
+std::vector<float3> photonColor;
 int validPhoton;
 
 // grid information used for second-pass of photon mapping
 #define MAX_GRID 27000000
 int gridStartIndex[MAX_GRID];
 int gridEndIndex[MAX_GRID];
-int gridIndexOfPhoton[MAX_PHOTON];
 const float gridLength = 30.f;
 const int gridSideCount = 20;
 const float gridSideLength = gridLength * gridSideCount;
 const float gridMin = -10.f;
 std::vector<std::pair<Photon, int>> vPhotonGrid;
-Photon secondPassPhoton[MAX_PHOTON];
+std::vector<Photon> secondPassPhoton;
 
 //------------------------------------------------------------------------------
 //
@@ -283,9 +282,12 @@ void createPrePassContext()
 
 	Buffer buffer = sutil::createOutputBuffer( prepass_context, RT_FORMAT_FLOAT4, photonSamples, photonSamples, use_pbo );
 	prepass_context["output_buffer"]->set( buffer );
-	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_FLOAT3, nPrePassIteration * 5 * 2 * photonSamples * photonSamples);
+	Buffer photonBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT);
+	photonBuffer->setFormat( RT_FORMAT_USER );
+	photonBuffer->setElementSize( sizeof( Photon ) );
+	photonBuffer->setSize(5 * photonSamples * photonSamples );
 	prepass_context["photonBuffer"]->set(photonBuffer);
-	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, nPrePassIteration * 5 * photonSamples * photonSamples);
+	Buffer isHitBuffer = prepass_context->createBuffer( RT_BUFFER_OUTPUT, RT_FORMAT_INT, 5 * photonSamples * photonSamples);
 	prepass_context["isHitBuffer"]->set(isHitBuffer);
 
 	// Setup programs
@@ -434,7 +436,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 #ifdef SPHERE
 	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
 		crtContext));
-	setMaterial(gis.back(), glass, "diffuse_color", blue);
+	setMaterial(gis.back(), specular, "diffuse_color", blue);
 #endif
 
 #ifdef COW
@@ -705,7 +707,7 @@ bool cmp(const std::pair<Photon, int> &a, const std::pair<Photon, int> &b)
 	return a.second < b.second;
 }
 
-void setPhotonGLBuffer()
+void getPrePassPhotonBuffer()
 {
 	GLvoid* data = 0;
 	RT_CHECK_ERROR(rtBufferMap(prepass_context["isHitBuffer"]->getBuffer()->get(), &data));
@@ -713,37 +715,43 @@ void setPhotonGLBuffer()
 	RT_CHECK_ERROR(rtBufferMap(prepass_context["photonBuffer"]->getBuffer()->get(), &data));
 	Photon *photon = (Photon*)data;
 
-	validPhoton = nPrePassIteration * 5 * photonSamples * photonSamples;
+	validPhoton = 5 * photonSamples * photonSamples;
 	//printf("Before TotalPhoton:%d\n", nTotalPhoton);
 	thrust::remove_if(photon, photon + validPhoton, isHit, thrust::logical_not<bool>());
 	validPhoton = thrust::count_if(isHit, isHit + validPhoton, thrust::identity<bool>());
 	//printf("After TotalPhoton:%d\n", nTotalPhoton);
-	printf("photon size:%d\n", sizeof(Photon));
+	//printf("photon size:%d\n", sizeof(Photon));
 	//FILE *fp1 = fopen("test1.txt", "w");
 	for (int i = 0; i < validPhoton; i++)
 	{
-		photonPos[i] = photon[i].position;
-		photonColor[i] = photon[i].color;
+		photonPos.push_back(photon[i].position);
+		photonColor.push_back(photon[i].color);
 		
 		//fprintf(fp1, "%f %f %f\n", photonColor[i].x, photonColor[i].y, photonColor[i].z);
 		int gridIndexX = (photon[i].position.x - gridMin) / gridLength;
 		int gridIndexY = (photon[i].position.y - gridMin) / gridLength;
 		int gridIndexZ = (photon[i].position.z - gridMin) / gridLength;
 		//printf("%d %d %d\n", gridIndexX, gridIndexY, gridIndexZ);
-		gridIndexOfPhoton[i] = gridIndexX * gridSideCount * gridSideCount + gridIndexY * gridSideCount + gridIndexZ;
-		std::pair<Photon, int> pair(photon[i], gridIndexOfPhoton[i]);
+		std::pair<Photon, int> pair(photon[i], gridIndexX * gridSideCount * gridSideCount + gridIndexY * gridSideCount + gridIndexZ);
 		vPhotonGrid.push_back(pair);
 	}
 	//fclose(fp1);
+	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
+	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
+}
+
+void sortGridAndPassBuffer()
+{
 	std::sort(vPhotonGrid.begin(), vPhotonGrid.end(), cmp);
 
+	validPhoton = vPhotonGrid.size();
+	printf("total photons:%d\n", validPhoton);
 	memset(gridStartIndex, -1, sizeof(gridStartIndex));
 	memset(gridEndIndex, -1, sizeof(gridEndIndex));
 	gridStartIndex[vPhotonGrid[0].second] = gridEndIndex[vPhotonGrid[0].second] = 0;
 	for (int i = 0; i < validPhoton; i++)
 	{
-		secondPassPhoton[i] = vPhotonGrid[i].first;
-		gridIndexOfPhoton[i] = vPhotonGrid[i].second;
+		secondPassPhoton.push_back(vPhotonGrid[i].first);
 
 		if (i == validPhoton - 1)
 		{
@@ -755,12 +763,12 @@ void setPhotonGLBuffer()
 			gridEndIndex[vPhotonGrid[i].second] = i;
 		}
 	}
-	
+
 	Buffer gridPhotonBuffer = context->createBuffer( RT_BUFFER_INPUT );
 	gridPhotonBuffer->setFormat( RT_FORMAT_USER );
 	gridPhotonBuffer->setElementSize( sizeof( Photon ) );
 	gridPhotonBuffer->setSize( validPhoton );
-	memcpy(gridPhotonBuffer->map(), secondPassPhoton, sizeof(Photon) * validPhoton);
+	memcpy(gridPhotonBuffer->map(), &secondPassPhoton[0], sizeof(Photon) * validPhoton);
 	gridPhotonBuffer->unmap();
 	context["photonBuffer"]->setBuffer(gridPhotonBuffer);
 
@@ -785,27 +793,9 @@ void setPhotonGLBuffer()
 	context[ "gridSideCount" ]->setInt(gridSideCount);
 	context[ "totalPhotons" ]->setInt(validPhoton);
 
-	//FILE *fp = fopen("test.txt", "w");
-	//for (int i = 0; i < gridSideCount * gridSideCount * gridSideCount; i++)
-	//{
-
-	//	fprintf(fp, "s:%d e:%d\n", gridStartIndex[i], gridEndIndex[i]);
-	//	fprintf(fp, "x:%d y:%d z:%d\n", i / (gridSideCount * gridSideCount) , i % (gridSideCount * gridSideCount) / gridSideCount, i % (gridSideCount * gridSideCount) % gridSideCount);
-	//	if (gridStartIndex[i] == -1 && gridEndIndex[i] == -1)
-	//		continue;
-	//	for (int j = gridStartIndex[i]; j <= gridEndIndex[i]; j++)
-	//	{
-	//		fprintf(fp, "c:%f %f %f\n", secondPassPhoton[j].color.x, secondPassPhoton[j].color.y, secondPassPhoton[j].color.z);
-	//		fprintf(fp, "p:%f %f %f\n", secondPassPhoton[j].position.x, secondPassPhoton[j].position.y, secondPassPhoton[j].position.z);
-	//	}
-	//}
-	//fclose(fp);
-
 	vPhotonGrid.clear();
-	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["isHitBuffer"]->getBuffer()->get()));
-	RT_CHECK_ERROR(rtBufferUnmap(prepass_context["photonBuffer"]->getBuffer()->get()));
+	secondPassPhoton.clear();
 }
-
 void drawPhoton()
 {
 	glMatrixMode (GL_PROJECTION);  
@@ -822,11 +812,11 @@ void drawPhoton()
 	glEnable(GL_POINT_SMOOTH);
 	glEnable(GL_DEPTH_TEST);
 
-	glVertexPointer(3, GL_FLOAT, 0, photonPos);
+	glVertexPointer(3, GL_FLOAT, 0, &photonPos[0]);
 	glEnableClientState(GL_VERTEX_ARRAY);
-	glColorPointer(3, GL_FLOAT, 0, photonColor);
+	glColorPointer(3, GL_FLOAT, 0, &photonColor[0]);
 	glEnableClientState(GL_COLOR_ARRAY);
-	glDrawArrays(GL_POINTS, 0, validPhoton);
+	glDrawArrays(GL_POINTS, 0, photonPos.size());
 
 	glDisable(GL_DEPTH_TEST);
 }
@@ -1046,6 +1036,8 @@ int main( int argc, char** argv )
 		{
 			prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
 			prepass_context->launch(0, photonSamples, photonSamples);
+			getPrePassPhotonBuffer(); 
+			printf("Frame number:%d\n", prepass_frame_number);
 		}
 
 		createContext(contextFileName);
@@ -1053,7 +1045,9 @@ int main( int argc, char** argv )
 		loadGeometry(context, contextFileName);
 
 		// photonSecondPass.cu should be created before this function call
-		setPhotonGLBuffer(); 
+		
+		sortGridAndPassBuffer();
+
 		prepass_context->destroy();
 
 
