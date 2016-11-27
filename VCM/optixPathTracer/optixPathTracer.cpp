@@ -113,7 +113,7 @@ float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 100; // number of samples in 360 degrees
 const int nPrePassIteration = 1000;
-const int maxDepth = 3;
+const int maxDepth = 5;
 
 std::vector<float3> photonPos;
 std::vector<float3> photonColor;

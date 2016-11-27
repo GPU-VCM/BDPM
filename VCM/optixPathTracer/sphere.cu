@@ -20,18 +20,19 @@ RT_PROGRAM void intersect(int primIdx)
 	float3 v = ray.origin - center;
 	float dv = dot(ray.direction, v); 
 	float temp = dv * dv - (dot(v, v) - radius * radius);
+	//bool flag = false;
 	if (temp > 0)
 	{
 		
-		float t = fminf(-dv + sqrt(temp), -dv - sqrt(temp));
-		if (t < 0)
-		{
-			t = fmaxf(-dv + sqrt(temp), -dv - sqrt(temp));
-			//printf("%f\n", t);
-		}
+		float t = -dv - sqrt(temp);
+		if (t <ray.tmin)
+			t = -dv + sqrt(temp);
+		//printf("%f\n", length(ray.direction));
 		//float3 end = ray.origin + t * ray.direction;(length(end - center) - radius)<0.01f &&
 		if(rtPotentialIntersection(t)) 
 		{
+			//if (flag)
+			//	printf("IN\n");
 			float3 p = ray.origin + t * ray.direction;
 			//printf("Intersected:%f %f %f\n", p.x, p.y, p.z);
 			geometric_normal = shading_normal = world_normal = normalize(ray.origin + t * ray.direction - center);

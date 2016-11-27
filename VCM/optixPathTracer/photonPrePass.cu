@@ -130,7 +130,7 @@ RT_PROGRAM void pathtrace_camera()
 
     float3 ray_origin = light_pos;
     float3 ray_direction = dir;
-	
+	//printf("%d\n", maxDepth);
 
 	float3 firstRay_direction = ray_direction;
 	//bool firstIntersection = false;
@@ -150,11 +150,14 @@ RT_PROGRAM void pathtrace_camera()
 		isHitBuffer[maxDepth * index + i] = 0;
     // Each iteration is a segment of the ray path.  The closest hit will
     // return new segments to be traced here.
+	//ray_origin = light.corner + light.v1 * 0.5f + light.v2 * 0.5f;
+	//ray_direction = make_float3(0.0f, -1.0f, 0.0f);
     for(;;)
     {
 		if (prd.depth >= maxDepth)
 			break;
 		prd.isSpecular = 0;
+		ray_direction = normalize(ray_direction);
         Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
         rtTrace(top_object, ray, prd);
 
@@ -412,17 +415,17 @@ RT_PROGRAM void glass_closest_hit_radiance()
 
 	if (cosTheta > 0.0f)
 	{
-		realNormal = -world_normal;
-		//printf("Inside\n");
+		realNormal = -world_normal;		
 	}
 	else
 	{
 		realNormal = world_normal;
 		//eta = n1 / n2;
 		cosTheta = -cosTheta;
+		//current_prd.attenuation = make_float3(1.0f, 0.0f, 0.0f);
 		//printf("OUTSIDE\n");
 	}
-
+	
 	unsigned int seed = t_hit * frame_number;
 	float u01 = rnd(seed);
 	//thrust::uniform_real_distribution<float> u01(0, 1);
@@ -441,7 +444,7 @@ RT_PROGRAM void glass_closest_hit_radiance()
 		//current_prd.direction = make_float3(c.x, c.y, c.z);
 	}
 
-	current_prd.origin = hitpoint;
+	current_prd.origin = hitpoint;// + ray.direction * 0.01;
     current_prd.attenuation = current_prd.attenuation;
     current_prd.countEmitted = true;
 	
