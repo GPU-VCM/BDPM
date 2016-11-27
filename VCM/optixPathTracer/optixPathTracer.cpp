@@ -78,7 +78,7 @@ uint32_t       width  = 600;
 uint32_t       height = 600;
 bool           use_pbo = true;
 
-int            frame_number = 1;
+int            frame_number = 0;
 int            sqrt_num_samples = 2;
 int            rr_begin_depth = 1;
 Program        pgram_intersection = 0;
@@ -113,7 +113,7 @@ float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 100; // number of samples in 360 degrees
 const int nPrePassIteration = 1000;
-const int maxDepth = 5;
+const int maxDepth = 3;
 
 std::vector<float3> photonPos;
 std::vector<float3> photonColor;
@@ -554,7 +554,7 @@ void updateCamera()
 	//mvp = projectionMatrix * viewMatrix;
 
     if( camera_changed ) // reset accumulation
-        frame_number = 1;
+        frame_number = 0;
     camera_changed = false;
 }
 

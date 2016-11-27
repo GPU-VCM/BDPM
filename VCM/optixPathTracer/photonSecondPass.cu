@@ -163,7 +163,7 @@ RT_PROGRAM void pathtrace_camera()
     float3 pixel_color = result;
 	
 
-    if (frame_number > 1)
+    if (frame_number > 0)
     {
         float a = 1.0f / (float)frame_number;
         float3 old_color = make_float3(output_buffer[launch_index]);
@@ -211,6 +211,8 @@ rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
 RT_PROGRAM void diffuse()
 {
+	current_prd.done = true;
+
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
 	//printf("%f %f %f %f %f %f\n", world_shading_normal.x, world_shading_normal.y, world_shading_normal.z,
 	//	shading_normal.x, shading_normal.y, shading_normal.z);
@@ -295,7 +297,6 @@ RT_PROGRAM void diffuse()
 	/*float density = counter / (radius * radius);*/
 	float scale = 5.f;
 	current_prd.attenuation = averageColor / (scale * radius * radius);
-	current_prd.done = true;
     current_prd.countEmitted = false;
     //current_prd.radiance = result;
 	current_prd.radiance = make_float3(1.0f);
