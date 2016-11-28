@@ -3,7 +3,11 @@
 *.sln
 *.vcxproj
 *.xcodeproj
+*.dll
+*.tlog
 !*.dll
+*.exp
+*.lib
 !*.lib
 build
 
@@ -24,7 +28,7 @@ build
 .AppleDouble
 .LSOverride
 
-# Icon must end with two \r
+# Icon must end with two \rt
 Icon
 
 
