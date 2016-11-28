@@ -81,7 +81,8 @@ struct BDPathNode
 	float hitDistance;
 	int materialIndex;
 	bool inside;
-};
+};
+
 
 // Scene wide variables
 rtDeclareVariable(float, scene_epsilon, , );

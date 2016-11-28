@@ -44,7 +44,7 @@ struct PerRayData_shadow
 
 
 rtDeclareVariable(int,               max_depth, , );
-rtBuffer<BasicLight>                 lights;
+rtBuffer<BasicLight>                 nlights;
 rtDeclareVariable(float3,            ambient_light_color, , );
 rtDeclareVariable(unsigned int,      radiance_ray_type, , );
 rtDeclareVariable(unsigned int,      shadow_ray_type, , );
@@ -79,9 +79,9 @@ __device__ void phongShade( float3 p_Kd,
   float3 result = p_Ka * ambient_light_color;
 
   // compute direct lighting
-  unsigned int num_lights = lights.size();
+  unsigned int num_lights = nlights.size();
   for(int i = 0; i < num_lights; ++i) {
-    BasicLight light = lights[i];
+	BasicLight light = nlights[i];
     float Ldist = optix::length(light.pos - hit_point);
     float3 L = optix::normalize(light.pos - hit_point);
     float nDl = optix::dot( p_normal, L);

@@ -40,13 +40,9 @@ if(GLUT_FOUND AND OPENGL_FOUND)
         Camera.h
 		AreaLight.cu
 		AreaLight.h
-		BackgroundLight.cu
-		BackgroundLight.h
 		bsdf.h
 		constantbg.cu
 		diffuse.cu
-		DirectionalLight.cu
-		DirectionalLight.h
 		Frame.h
 		intersection_refinement.h
 		PerRayData.h

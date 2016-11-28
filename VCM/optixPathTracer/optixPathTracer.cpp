@@ -214,11 +214,6 @@ void createContext()
 	context->setEntryPointCount(1);
 	context->setStackSize(1800);
 
-	//context["scene_epsilon"]->setFloat(1.e-3f);
-	//context["pathtrace_ray_type"]->setUint(0u);
-	//context["pathtrace_shadow_ray_type"]->setUint(1u);
-	//context["pathtrace_light_ray_type"]->setUint(2u);
-	//context["rr_begin_depth"]->setUint(rr_begin_depth);
 	lightConditions = 2;
 	materials = object = 0;
 	mMaxPathLength = 5;
@@ -236,10 +231,10 @@ void createContext()
 	context["vfov"]->setFloat(vfov);
 
 	Buffer buffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
-	context["output_buffer"]->set(buffer);
+	context["output_buffer"]->setBuffer(buffer);
 
 	Buffer temp_buffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, false);
-	context["temp_buffer"]->set(temp_buffer);
+	context["temp_buffer"]->setBuffer(temp_buffer);
 
 	//ray gen programs
 	std::string ptx = ptxPath(std::string("pinhole_camera.cu"));
@@ -254,12 +249,9 @@ void createContext()
 
 
 	// Setup programs
-	const std::string cuda_file = std::string(SAMPLE_NAME) + ".cu";
-	const std::string ptx_path = ptxPath(cuda_file);
-	//context->setRayGenerationProgram(0, context->createProgramFromPTXFile(ptx_path, "pathtrace_camera"));
-	//context->setExceptionProgram(0, context->createProgramFromPTXFile(ptx_path, "exception"));
-	//context->setMissProgram(0, context->createProgramFromPTXFile(ptx_path, "miss"));
-
+	/*const std::string cuda_file = std::string(SAMPLE_NAME) + ".cu";
+	const std::string ptx_path = ptxPath(cuda_file);*/
+	
 	context["sqrt_num_samples"]->setUint(sqrt_num_samples);
 	context["bad_color"]->setFloat(1000000.0f, 0.0f, 1000000.0f); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
 	context["bg_color"]->setFloat(make_float3(108.0f / 255.0f, 166.0f / 255.0f, 205.0f / 255.0f) * 0.5f);
@@ -287,6 +279,20 @@ void createContext()
 	context["aRadiusAlpha"]->setFloat(0.75f);
 }
 
+void createLightBuffer(Mesh model, std::vector<Light> &nlights, const float3 &emissive)
+{
+	for (int i = 0; i < model.num_vertices; ++i){
+		Light vlight;
+		vlight.SetupAreaLight(
+							 make_float3(model.positions[i * 3 + 0]),
+							 make_float3(model.positions[i * 3 + 1]),
+							 make_float3(model.positions[i * 3 + 2]),
+							 emissive
+							);
+		nlights.push_back(vlight);
+	}
+}
+
 
 void loadGeometry(const std::string mesh_file)
 {
@@ -296,21 +302,93 @@ void loadGeometry(const std::string mesh_file)
 	//context->setPrintLaunchIndex(0, 0, 0);
 
 	// Light buffer
-	ParallelogramLight light;
+	/*ParallelogramLight light;
 	light.corner = make_float3(343.0f, 548.6f, 227.0f);
 	light.v1 = make_float3(-130.0f, 0.0f, 0.0f);
 	light.v2 = make_float3(0.0f, 0.0f, 105.0f);
 	light.normal = normalize(cross(light.v1, light.v2));
 	light.emission = make_float3(15.0f, 15.0f, 15.0f);
+*/
+	std::vector<Light> nlights;
+	Mesh model;// = glmReadOBJ("./CornellLight.obj");
+	std::string light_name = std::string(sutil::samplesDir()) + "/data/CornellLight.obj";
+	loadMesh(light_name, model);
+	if (lightConditions > 1)
+		createLightBuffer(model, nlights, make_float3(25.03329895614464f, 25.03329895614464f, 25.03329895614464f));
 
-	Buffer light_buffer = context->createBuffer(RT_BUFFER_INPUT);
-	light_buffer->setFormat(RT_FORMAT_USER);
-	light_buffer->setElementSize(sizeof(ParallelogramLight));
-	light_buffer->setSize(1u);
-	memcpy(light_buffer->map(), &light, sizeof(light));
-	light_buffer->unmap();
-	context["lights"]->setBuffer(light_buffer);
+	// Create a buffer for the next-event estimation...
 
+	Buffer m_light_buffer = context->createBuffer(RT_BUFFER_INPUT);
+	m_light_buffer->setFormat(RT_FORMAT_USER);
+	m_light_buffer->setElementSize(sizeof(Light));
+	m_light_buffer->setSize(0);
+	if (nlights.size() != 0)
+	{
+		m_light_buffer->setSize(nlights.size());
+		memcpy(m_light_buffer->map(), &nlights[0], nlights.size() * sizeof(Light));
+		m_light_buffer->unmap();
+	}
+	context["lightBuffer"]->setBuffer(m_light_buffer);
+
+
+	const int numMat = 7;
+	optix::Material material[numMat];
+	for (int i = 0; i < numMat; ++i)
+		material[i] = context->createMaterial();
+
+	// Load closest hit program...
+
+	Program closest_hit = context->createProgramFromPTXFile(ptxPath("diffuse.cu"), "closest_hit_diffuse");
+	Program any_hit = context->createProgramFromPTXFile(ptxPath("diffuse.cu"), "any_hit_occlusion");
+
+	material[0]->setClosestHitProgram(0, closest_hit);
+	material[0]->setAnyHitProgram(1, any_hit);
+	TriangleMaterial mat;
+	mat.Reset();
+	mat.mDiffuseReflectance = make_float3(0.76f, 0.75f, 0.5f);
+	material[0]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+
+	material[1]->setClosestHitProgram(0, closest_hit);
+	material[1]->setAnyHitProgram(1, any_hit);
+	mat.Reset();
+	mat.mDiffuseReflectance = make_float3(0.63f, 0.06f, 0.04f);
+	material[1]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+
+	material[2]->setClosestHitProgram(0, closest_hit);
+	material[2]->setAnyHitProgram(1, any_hit);
+	mat.Reset();
+	mat.mDiffuseReflectance = make_float3(0.15f, 0.48f, 0.09f);
+	material[2]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+
+	// Light material...
+
+	material[3]->setClosestHitProgram(0, closest_hit);
+	material[3]->setAnyHitProgram(1, any_hit);
+	mat.Reset();
+	mat.mDiffuseReflectance = make_float3(0.803922f, 0.803922f, 0.803922f);
+	mat.isEmitter = true;
+	material[3]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+
+	material[4]->setClosestHitProgram(0, closest_hit);
+	material[4]->setAnyHitProgram(1, any_hit);
+	mat.Reset();
+	mat.mMirrorReflectance = make_float3(1, 1, 1);
+	mat.mIOR = 1.6f;
+	material[4]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+
+	material[5]->setClosestHitProgram(0, closest_hit);
+	material[5]->setAnyHitProgram(1, any_hit);
+	mat.Reset();
+	mat.mDiffuseReflectance = make_float3(0.1, 0.1, 0.1);
+	mat.mPhongReflectance = make_float3(0.7f);
+	mat.mPhongExponent = 90.0f;
+	material[5]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+
+	material[6]->setClosestHitProgram(0, closest_hit);
+	material[6]->setAnyHitProgram(1, any_hit);
+	mat.Reset();
+	mat.mMirrorReflectance = make_float3(1, 1, 1);
+	material[6]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
 
 	// Set up material
 	const std::string cuda_file = std::string("diffuse") + ".cu";
@@ -321,27 +399,12 @@ void loadGeometry(const std::string mesh_file)
 	diffuse->setClosestHitProgram(0, diffuse_ch);
 	diffuse->setAnyHitProgram(1, diffuse_ah);
 
-	// Set up material
-	//const std::string cuda_file = std::string(SAMPLE_NAME) + ".cu";
-	//std::string ptx_path = ptxPath(cuda_file);
-	//Material specular = context->createMaterial();
-	//Program specular_ch = context->createProgramFromPTXFile(ptx_path, "specular");
-	////Program specular_ah = context->createProgramFromPTXFile(ptx_path, "shadow");
-	//specular->setClosestHitProgram(0, specular_ch);
-	////specular->setAnyHitProgram(1, specular_ah);
-
-	Material diffuse_light = context->createMaterial();
-	Program diffuse_em = context->createProgramFromPTXFile(ptx_path, "diffuseEmitter");
-	Program diffuse_lgtray = context->createProgramFromPTXFile(ptx_path, "diffuseEmitterRay");
-	diffuse_light->setClosestHitProgram(0, diffuse_em);
-	diffuse_light->setAnyHitProgram(2, diffuse_lgtray);
-
 	// Set up parallelogram programs
 	ptx_path = ptxPath("parallelogram.cu");
 	pgram_bounding_box = context->createProgramFromPTXFile(ptx_path, "bounds");
 	pgram_intersection = context->createProgramFromPTXFile(ptx_path, "intersect");
 
-	ptx_path = ptxPath("triangle_mesh.cu");
+	ptx_path = ptxPath("triangle_mesh_iterative.cu");
 	tri_bounding_box = context->createProgramFromPTXFile(ptx_path, "mesh_bounds");
 	tri_intersection = context->createProgramFromPTXFile(ptx_path, "mesh_intersect");
 
@@ -353,91 +416,115 @@ void loadGeometry(const std::string mesh_file)
 	const float3 red = make_float3(0.8f, 0.05f, 0.05f);
 	const float3 light_em = make_float3(15.0f, 15.0f, 15.0f);
 
-	// Floor
-	gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f),
-		make_float3(556.0f, 0.0f, 0.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
-	// Ceiling
-	gis.push_back(createParallelogram(make_float3(0.0f, 548.8f, 0.0f),
-		make_float3(556.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
-	// Back wall
-	gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 559.2f),
-		make_float3(0.0f, 548.8f, 0.0f),
-		make_float3(556.0f, 0.0f, 0.0f)));
-	//setMaterial(gis.back(), specular, "specular_color", white);
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//// Floor
+	//gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
+	//	make_float3(0.0f, 0.0f, 559.2f),
+	//	make_float3(556.0f, 0.0f, 0.0f)));
+	//gis.back()->addMaterial(material[0]);
+	////setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
-	// Right wall
-	gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 548.8f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", green);
+	//// Ceiling
+	//gis.push_back(createParallelogram(make_float3(0.0f, 548.8f, 0.0f),
+	//	make_float3(556.0f, 0.0f, 0.0f),
+	//	make_float3(0.0f, 0.0f, 559.2f)));
+	//gis.back()->addMaterial(material[0]);
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
-	// Left wall
-	gis.push_back(createParallelogram(make_float3(556.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f),
-		make_float3(0.0f, 548.8f, 0.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", red);
+	//// Back wall
+	//gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 559.2f),
+	//	make_float3(0.0f, 548.8f, 0.0f),
+	//	make_float3(556.0f, 0.0f, 0.0f)));
+	////setMaterial(gis.back(), specular, "specular_color", white);
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
-	// Short block
-	gis.push_back(createParallelogram(make_float3(130.0f, 165.0f, 65.0f),
-		make_float3(-48.0f, 0.0f, 160.0f),
-		make_float3(160.0f, 0.0f, 49.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back(createParallelogram(make_float3(290.0f, 0.0f, 114.0f),
-		make_float3(0.0f, 165.0f, 0.0f),
-		make_float3(-50.0f, 0.0f, 158.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back(createParallelogram(make_float3(130.0f, 0.0f, 65.0f),
-		make_float3(0.0f, 165.0f, 0.0f),
-		make_float3(160.0f, 0.0f, 49.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back(createParallelogram(make_float3(82.0f, 0.0f, 225.0f),
-		make_float3(0.0f, 165.0f, 0.0f),
-		make_float3(48.0f, 0.0f, -160.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back(createParallelogram(make_float3(240.0f, 0.0f, 272.0f),
-		make_float3(0.0f, 165.0f, 0.0f),
-		make_float3(-158.0f, 0.0f, -47.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//// Right wall
+	//gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
+	//	make_float3(0.0f, 548.8f, 0.0f),
+	//	make_float3(0.0f, 0.0f, 559.2f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", green);
 
-	// Tall block
-	gis.push_back(createParallelogram(make_float3(423.0f, 330.0f, 247.0f),
-		make_float3(-158.0f, 0.0f, 49.0f),
-		make_float3(49.0f, 0.0f, 159.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back(createParallelogram(make_float3(423.0f, 0.0f, 247.0f),
-		make_float3(0.0f, 330.0f, 0.0f),
-		make_float3(49.0f, 0.0f, 159.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back(createParallelogram(make_float3(472.0f, 0.0f, 406.0f),
-		make_float3(0.0f, 330.0f, 0.0f),
-		make_float3(-158.0f, 0.0f, 50.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back(createParallelogram(make_float3(314.0f, 0.0f, 456.0f),
-		make_float3(0.0f, 330.0f, 0.0f),
-		make_float3(-49.0f, 0.0f, -160.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.push_back(createParallelogram(make_float3(265.0f, 0.0f, 296.0f),
-		make_float3(0.0f, 330.0f, 0.0f),
-		make_float3(158.0f, 0.0f, -49.0f)));
-	setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//// Left wall
+	//gis.push_back(createParallelogram(make_float3(556.0f, 0.0f, 0.0f),
+	//	make_float3(0.0f, 0.0f, 559.2f),
+	//	make_float3(0.0f, 548.8f, 0.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", red);
+
+	//// Short block
+	//gis.push_back(createParallelogram(make_float3(130.0f, 165.0f, 65.0f),
+	//	make_float3(-48.0f, 0.0f, 160.0f),
+	//	make_float3(160.0f, 0.0f, 49.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back(createParallelogram(make_float3(290.0f, 0.0f, 114.0f),
+	//	make_float3(0.0f, 165.0f, 0.0f),
+	//	make_float3(-50.0f, 0.0f, 158.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back(createParallelogram(make_float3(130.0f, 0.0f, 65.0f),
+	//	make_float3(0.0f, 165.0f, 0.0f),
+	//	make_float3(160.0f, 0.0f, 49.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back(createParallelogram(make_float3(82.0f, 0.0f, 225.0f),
+	//	make_float3(0.0f, 165.0f, 0.0f),
+	//	make_float3(48.0f, 0.0f, -160.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back(createParallelogram(make_float3(240.0f, 0.0f, 272.0f),
+	//	make_float3(0.0f, 165.0f, 0.0f),
+	//	make_float3(-158.0f, 0.0f, -47.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+
+	//// Tall block
+	//gis.push_back(createParallelogram(make_float3(423.0f, 330.0f, 247.0f),
+	//	make_float3(-158.0f, 0.0f, 49.0f),
+	//	make_float3(49.0f, 0.0f, 159.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back(createParallelogram(make_float3(423.0f, 0.0f, 247.0f),
+	//	make_float3(0.0f, 330.0f, 0.0f),
+	//	make_float3(49.0f, 0.0f, 159.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back(createParallelogram(make_float3(472.0f, 0.0f, 406.0f),
+	//	make_float3(0.0f, 330.0f, 0.0f),
+	//	make_float3(-158.0f, 0.0f, 50.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back(createParallelogram(make_float3(314.0f, 0.0f, 456.0f),
+	//	make_float3(0.0f, 330.0f, 0.0f),
+	//	make_float3(-49.0f, 0.0f, -160.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.push_back(createParallelogram(make_float3(265.0f, 0.0f, 296.0f),
+	//	make_float3(0.0f, 330.0f, 0.0f),
+	//	make_float3(158.0f, 0.0f, -49.0f)));
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
 
 	//load mesh
 	OptiXMesh mesh;
 	mesh.context = context;
-
 	mesh.intersection = tri_intersection;
 	mesh.bounds = tri_bounding_box;
-	mesh.material = diffuse;
 	loadMesh(mesh_file, mesh, Matrix4x4::scale(make_float3(3000.f)) * Matrix4x4::translate(make_float3(0.1f, 0.f, 0.1f)));
 	gis.push_back(mesh.geom_instance);
-	setMaterial(gis.back(), diffuse, "diffuse_color", red);
+	//gis.back()->addMaterial(material[0]);
+	gis.back()->addMaterial(material[0]);
+
+	/*OptiXMesh floor;
+	floor.intersection = tri_intersection;
+	floor.bounds = tri_bounding_box;
+	floor.context = context;
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellDiffuse.obj", floor, Matrix4x4::identity());
+	gis.push_back(floor.geom_instance);
+	gis.back()->addMaterial(material[0]);
+
+	floor.intersection = tri_intersection;
+	floor.bounds = tri_bounding_box;
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellRedWall.obj", floor, Matrix4x4::identity());
+	gis.push_back(floor.geom_instance);
+	gis.back()->addMaterial(material[0]);
+
+	floor.intersection = tri_intersection;
+	floor.bounds = tri_bounding_box;
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellBlueWall.obj", floor, Matrix4x4::identity());
+	gis.push_back(floor.geom_instance);
+	gis.back()->addMaterial(material[0]);*/
+
 
 	// Create shadow group (no light)
 	GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
@@ -445,10 +532,14 @@ void loadGeometry(const std::string mesh_file)
 	context["top_shadower"]->set(shadow_group);
 
 	// Light
-	gis.push_back(createParallelogram(make_float3(343.0f, 548.6f, 227.0f),
-		make_float3(-130.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 0.0f, 105.0f)));
-	setMaterial(gis.back(), diffuse_light, "emission_color", light_em);
+	OptiXMesh floor;
+	floor.context = context;
+	floor.intersection = tri_intersection;
+	floor.bounds = tri_bounding_box;
+	
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", floor, Matrix4x4::identity() * Matrix4x4::translate(make_float3(0.f, 0.f, 0.f)));
+	gis.push_back(floor.geom_instance);
+	gis.back()->addMaterial(material[3]);
 
 	// Create geometry group
 
