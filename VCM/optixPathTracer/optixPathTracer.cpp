@@ -113,14 +113,14 @@ float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 100; // number of samples in 360 degrees
 const int nPrePassIteration = 1000;
-const int maxDepth = 3;
+const int maxDepth = 5;
 
 std::vector<float3> photonPos;
 std::vector<float3> photonColor;
 int validPhoton;
 
 // grid information used for second-pass of photon mapping
-#define MAX_GRID 27000000
+#define MAX_GRID 30000000
 int gridStartIndex[MAX_GRID];
 int gridEndIndex[MAX_GRID];
 const float gridLength = 30.f;
@@ -437,9 +437,17 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 #define SPHERE
 
 #ifdef SPHERE
-	gis.push_back( createSphere( make_float3(250.0f, 250.0f, 250.0f), 100.0f,
+	gis.push_back( createSphere( make_float3(150.0f, 350.0f, 350.0f), 100.0f,
 		crtContext));
-	setMaterial(gis.back(), glass, "diffuse_color", blue);
+	setMaterial(gis.back(), specular, "diffuse_color", blue);
+
+	//gis.push_back( createSphere( make_float3(220.0f, 250.0f, 220.0f), 100.0f,
+	//	crtContext));
+	//setMaterial(gis.back(), glass, "diffuse_color", blue);
+
+	//gis.push_back( createSphere( make_float3(450.0f, 150.0f, 250.0f), 100.0f,
+	//	crtContext));
+	//setMaterial(gis.back(), glass, "diffuse_color", blue);
 #endif
 
 #ifdef COW
@@ -458,7 +466,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/dragon.obj";
 	mesh.context = crtContext;
-	mesh.material = glass;
+	mesh.material = specular;
 
 	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(270.f, 100.f, 360.f)) * Matrix4x4::scale(make_float3(35.f)));
 	gis.push_back(mesh.geom_instance);
@@ -778,16 +786,16 @@ void sortGridAndPassBuffer()
 	Buffer gridStartIndexBuffer = context->createBuffer( RT_BUFFER_INPUT );
 	gridStartIndexBuffer->setFormat( RT_FORMAT_USER );
 	gridStartIndexBuffer->setElementSize( sizeof( int ) );
-	gridStartIndexBuffer->setSize( validPhoton );
-	memcpy(gridStartIndexBuffer->map(), gridStartIndex, sizeof(int) * validPhoton);
+	gridStartIndexBuffer->setSize( MAX_GRID );
+	memcpy(gridStartIndexBuffer->map(), gridStartIndex, sizeof(int) * MAX_GRID);
 	gridStartIndexBuffer->unmap();
 	context["gridStartIndexBuffer"]->setBuffer(gridStartIndexBuffer);
 
 	Buffer gridEndIndexBuffer = context->createBuffer( RT_BUFFER_INPUT );
 	gridEndIndexBuffer->setFormat( RT_FORMAT_USER );
 	gridEndIndexBuffer->setElementSize( sizeof( int ) );
-	gridEndIndexBuffer->setSize( validPhoton );
-	memcpy(gridEndIndexBuffer->map(), gridEndIndex, sizeof(int) * validPhoton);
+	gridEndIndexBuffer->setSize( MAX_GRID );
+	memcpy(gridEndIndexBuffer->map(), gridEndIndex, sizeof(int) * MAX_GRID);
 	gridEndIndexBuffer->unmap();
 	context["gridEndIndexBuffer"]->setBuffer(gridEndIndexBuffer);
 
@@ -830,6 +838,7 @@ void glutDisplay()
 	glClearDepth(1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//testGetBuffer();
+	printf("Iteration:%d\n", frame_number);
     updateCamera();
     context->launch( 0, width, height );
 
@@ -837,6 +846,7 @@ void glutDisplay()
     drawPhoton();
 #else
 	sutil::displayBufferGL( getOutputBuffer());
+	
 #endif	
 	
 	//drawBoundingBox();

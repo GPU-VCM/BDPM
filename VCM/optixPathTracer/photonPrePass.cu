@@ -139,7 +139,7 @@ RT_PROGRAM void pathtrace_camera()
     PerRayData_pathtrace prd;
     prd.result = make_float3(0.f);
     prd.attenuation = make_float3(1.f);
-	prd.radiance = make_float3(0.15f, 0.15f, 0.05f);
+	prd.radiance = make_float3(0.45f, 0.45f, 0.15f);
     prd.countEmitted = true;
     prd.done = false;
 	prd.seed = seed;
@@ -289,48 +289,44 @@ RT_PROGRAM void diffuse()
     //
     // Next event estimation (compute direct lighting).
     //
-   // unsigned int num_lights = lights.size();
-   // float3 result = make_float3(0.0f);
-   // for(int i = 0; i < num_lights; ++i)
-   // {
-   //     // Choose random point on light
-   //     ParallelogramLight light = lights[i];
-   //     const float z1 = rnd(current_prd.seed);
-   //     const float z2 = rnd(current_prd.seed);
-   //     const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
+    unsigned int num_lights = lights.size();
+    float3 result = make_float3(0.0f);
+    for(int i = 0; i < num_lights; ++i)
+    {
+        // Choose random point on light
+        ParallelogramLight light = lights[i];
+        const float z1 = rnd(current_prd.seed);
+        const float z2 = rnd(current_prd.seed);
+        const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
 
-   //     // Calculate properties of light sample (for area based pdf)
-   //     const float  Ldist = length(light_pos - hitpoint);
-   //     const float3 L     = normalize(light_pos - hitpoint);
-   //     const float  nDl   = dot( ffnormal, L );
-   //     const float  LnDl  = dot( light.normal, L );
+        // Calculate properties of light sample (for area based pdf)
+        const float  Ldist = length(light_pos - hitpoint);
+        const float3 L     = normalize(light_pos - hitpoint);
+        const float  nDl   = dot( ffnormal, L );
+        const float  LnDl  = dot( light.normal, L );
 
-   //     // cast shadow ray
-   //     if ( nDl > 0.0f && LnDl > 0.0f )
-   //     {
-   //         PerRayData_pathtrace_shadow shadow_prd;
-   //         shadow_prd.inShadow = false;
-   //         // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
-   //         Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
-   //         rtTrace(top_object, shadow_ray, shadow_prd);
+        // cast shadow ray
+        if ( nDl > 0.0f && LnDl > 0.0f )
+        {
+            PerRayData_pathtrace_shadow shadow_prd;
+            shadow_prd.inShadow = false;
+            // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
+            Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
+            rtTrace(top_object, shadow_ray, shadow_prd);
 
-			//// do not calculate shadow in pre-pass, calculate in the second-pass
+			// do not calculate shadow in pre-pass, calculate in the second-pass
 
 
-   //         if(!shadow_prd.inShadow)
-   //         {
-   //             const float A = length(cross(light.v1, light.v2));
-   //             // convert area based pdf to solid angle
-   //             const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-   //             result += light.emission * weight;
-   //         }
-			////else
-			////{
-			////	current_prd.attenuation = result = make_float3(1.0f);
-			////}
+            if(!shadow_prd.inShadow)
+            {
+                const float A = length(cross(light.v1, light.v2));
+                // convert area based pdf to solid angle
+                const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
+                result += light.emission * weight;
+            }
 
-   //     }
-   // }
+        }
+    }
 
     //current_prd.radiance = result;
 	current_prd.radiance *= DECRESE_FACTOR;
