@@ -34,7 +34,7 @@ rtDeclareVariable(float4, plane, , );
 rtDeclareVariable(float3, v1, , );
 rtDeclareVariable(float3, v2, , );
 rtDeclareVariable(float3, anchor, , );
-rtDeclareVariable(int, lgt_instance, , ) = { 0 };
+rtDeclareVariable(int, lgt_instance, , ) = { -1 };
 
 rtDeclareVariable(float3, texcoord, attribute texcoord, );
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, );

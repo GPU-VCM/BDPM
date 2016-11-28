@@ -46,6 +46,21 @@ struct PerRayData_pathtrace
 	int done;
 };
 
+// The sole point of this structure is to make carrying around the ray baggage easier.
+struct SubPathState
+{
+	float3 mOrigin;             // Path origin
+	float3 mDirection;          // Where to go next
+	float3 mThroughput;         // Path throughput
+	uint  mPathLength : 10; // Number of path segments, including this
+	uint  mIsFiniteLight : 1; // Just generate by finite light
+	uint  mSpecularPath : 1; // All scattering events so far were specular
+
+	float dVCM; // MIS quantity used for vertex connection and merging
+	float dVC;  // MIS quantity used for vertex connection
+	float dVM;  // MIS quantity used for vertex merging
+};
+
 struct PerRayData_pathtrace_shadow
 {
 	bool inShadow;
@@ -55,6 +70,18 @@ struct PerRayData_pathtrace_light
 {
 	bool hitLight;
 };
+
+struct BDPathNode
+{
+	optix::float3 origin;
+	float cosin;
+	optix::float3 ffnormal;
+	float probability;
+	optix::float3 contribution;
+	float hitDistance;
+	int materialIndex;
+	bool inside;
+};
 
 // Scene wide variables
 rtDeclareVariable(float, scene_epsilon, , );
@@ -219,6 +246,7 @@ RT_PROGRAM void diffuse()
 	float3 ffnormal = faceforward(world_shading_normal, -ray.direction, world_geometric_normal);
 
 	float3 hitpoint = ray.origin + t_hit * ray.direction;
+	float radius = (9.5f / 2.0f) * sqrtf(2.0f);
 
 	//
 	// Generate a reflection ray.  This will be traced back in ray-gen.
@@ -274,33 +302,42 @@ RT_PROGRAM void diffuse()
 				
 				const float A = length(cross(light.v1, light.v2));
 				lightPdf = 1 / A;
-				brdfPdf = M_1_PIf /** abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z))*/;
+				float oDirectPdfW = dot(L, L) / (LnDl * A);
+				/**oCosAtLight = cosNormalDir;*/
+				float oEmissionPdfW = LnDl * M_1_PIf / A;
+				lightPdf = oEmissionPdfW;
+
+				brdfPdf = M_1_PIf * abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z));
 				// convert area based pdf to solid angle
 				const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
 				result += light.emission * weight /** (lightPdf / (lightPdf + brdfPdf))*/;
 			}
 		}
 	}
-	//Ray brdf_ray = make_Ray(hitpoint, p, pathtrace_light_ray_type, scene_epsilon, RT_DEFAULT_MAX);
-	//PerRayData_pathtrace_light brdf_prd;
-	//brdf_prd.hitLight = false;
-	//rtTrace(top_object, brdf_ray, brdf_prd);
-	//if (brdf_prd.hitLight){
-	//	brdfPdf = M_1_PIf;
-	//	float3 lgt_hitpoint = brdf_ray.origin + t_hit * brdf_ray.direction;
-	//	const float  Ldist = length(lgt_hitpoint - hitpoint);
-	//	const float3 L = normalize(lgt_hitpoint - hitpoint);
-	//	const float  nDl = dot(ffnormal, L);
-	//	const float  LnDl = dot(lights[0].normal, L);
+	Ray brdf_ray = make_Ray(hitpoint, p, pathtrace_light_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+	PerRayData_pathtrace_light brdf_prd;
+	brdf_prd.hitLight = false;
+	rtTrace(top_object, brdf_ray, brdf_prd);
+	if (brdf_prd.hitLight){
+		brdfPdf = M_1_PIf;
+		float3 lgt_hitpoint = brdf_ray.origin + t_hit * brdf_ray.direction;
+		const float  Ldist = length(lgt_hitpoint - hitpoint);
+		const float3 L = normalize(lgt_hitpoint - hitpoint);
+		const float  nDl = dot(ffnormal, L);
+		const float  LnDl = dot(lights[0].normal, L);
 
-	//	const float A = length(cross(lights[0].v1, lights[0].v2));
-	//	// convert area based pdf to solid angle
-	//	lightPdf = 1 / A;
-	//	brdfPdf = M_1_PIf/** abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z))*/;
-	//	const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-	//	result += lights[0].emission * LnDl * (brdfPdf / (lightPdf + brdfPdf));
-	//	//result = make_float3(10.f, 10.f, 0.f);
-	//}
+		const float A = length(cross(lights[0].v1, lights[0].v2));
+		// convert area based pdf to solid angle
+		lightPdf = 1 / A;
+		float oDirectPdfW = dot(L, L) / (LnDl * A);
+		/**oCosAtLight = cosNormalDir;*/
+		float oEmissionPdfW = LnDl * M_1_PIf / A;
+		lightPdf = oEmissionPdfW;
+		brdfPdf = M_1_PIf* abs(cos(rtTransformVector(RT_WORLD_TO_OBJECT, p).z));
+		const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
+		result += lights[0].emission * LnDl * (brdfPdf / (lightPdf + brdfPdf));
+		//result = make_float3(10.f, 10.f, 0.f);
+	}
 
 	current_prd.radiance = result;
 }

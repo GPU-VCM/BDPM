@@ -32,16 +32,29 @@ if(GLUT_FOUND AND OPENGL_FOUND)
     include_directories(${GLUT_INCLUDE_DIR})
     add_definitions(-DGLUT_FOUND -DGLUT_NO_LIB_PRAGMA)
 
-    OPTIX_add_sample_executable( optixPathTracer 
-        optixPathTracer.cpp
-        optixPathTracer.cu
-        optixPathTracer.h
+    OPTIX_add_sample_executable( optixPathTracer
 
-        parallelogram.cu
-        sphere.cu
-        random.h
-		triangle_mesh.cu
+		optixPathTracer.cpp
+		optixPathTracer.h
+        commonStructs.h
+        Camera.h
+		AreaLight.cu
+		AreaLight.h
+		BackgroundLight.cu
+		BackgroundLight.h
+		bsdf.h
+		constantbg.cu
+		diffuse.cu
+		DirectionalLight.cu
+		DirectionalLight.h
+		Frame.h
 		intersection_refinement.h
+		PerRayData.h
+		pinhole_camera.cu
+		triangle_mesh_iterative.cu
+		utils.h
+
+       
         )
 else()
     # GLUT or OpenGL not found

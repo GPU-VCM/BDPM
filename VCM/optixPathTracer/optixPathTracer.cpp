@@ -53,7 +53,8 @@
 #include <sutil.h>
 #include <Arcball.h>
 #include <OptiXMesh.h>
-#include "random.h"
+#include "commonStructs.h"
+#include "Camera.h"
 
 #include <algorithm>
 #include <cstring>
@@ -94,6 +95,9 @@ sutil::Arcball arcball;
 // Mouse state
 int2           mouse_prev_pos;
 int            mouse_button;
+
+int lightConditions, mMaxPathLength;
+int materials, object;
 
 
 //------------------------------------------------------------------------------
@@ -195,36 +199,12 @@ GeometryInstance createParallelogram(
 	parallelogram["anchor"]->setFloat(anchor);
 	parallelogram["v1"]->setFloat(v1);
 	parallelogram["v2"]->setFloat(v2);
+	parallelogram["invArea"]->setFloat(1.f / length(cross(v1, v2)));
 
 	GeometryInstance gi = context->createGeometryInstance();
 	gi->setGeometry(parallelogram);
 	return gi;
 }
-
-GeometryInstance createTriangle(
-	const float3& v1,
-	const float3& v2,
-	const float3& v3)
-{
-	Geometry triangle = context->createGeometry();
-	triangle->setPrimitiveCount(1u);
-	triangle->setIntersectionProgram(tri_intersection);
-	triangle->setBoundingBoxProgram(tri_bounding_box);
-
-	//triangle["v1"]->setFloat(v1);
-	//triangle["v2"]->setFloat(v2);
-	//triangle["v3"]->setFloat(v3);
-
-	const float3 offset = make_float3(-3.0f + 2.0f * 1.f, 0.0f, 0.0f);
-	triangle["v1"]->setFloat(make_float3(20.0f, 0.f, -20.0f));
-	triangle["v2"]->setFloat(make_float3(-20.0f, 0.f, -20.0f));
-	triangle["v3"]->setFloat(make_float3(-20.0f, 0.f, -20.0f));
-
-	GeometryInstance gi = context->createGeometryInstance();
-	gi->setGeometry(triangle);
-	return gi;
-}
-
 
 
 void createContext()
@@ -234,25 +214,77 @@ void createContext()
 	context->setEntryPointCount(1);
 	context->setStackSize(1800);
 
-	context["scene_epsilon"]->setFloat(1.e-3f);
-	context["pathtrace_ray_type"]->setUint(0u);
-	context["pathtrace_shadow_ray_type"]->setUint(1u);
-	context["pathtrace_light_ray_type"]->setUint(2u);
-	context["rr_begin_depth"]->setUint(rr_begin_depth);
+	//context["scene_epsilon"]->setFloat(1.e-3f);
+	//context["pathtrace_ray_type"]->setUint(0u);
+	//context["pathtrace_shadow_ray_type"]->setUint(1u);
+	//context["pathtrace_light_ray_type"]->setUint(2u);
+	//context["rr_begin_depth"]->setUint(rr_begin_depth);
+	lightConditions = 2;
+	materials = object = 0;
+	mMaxPathLength = 5;
+	context["mMaxPathLength"]->setInt(10);
+	context->setRayTypeCount(3);
+	context->setEntryPointCount(3);
+	context->setStackSize(3072);
+
+	context["max_depth"]->setInt(1);
+	context["radiance_ray_type"]->setUint(0u);
+	context["shadow_ray_type"]->setUint(1u);
+	context["scene_epsilon"]->setFloat(1.e-4f);
+
+	const float vfov = 45.0f;
+	context["vfov"]->setFloat(vfov);
 
 	Buffer buffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, use_pbo);
 	context["output_buffer"]->set(buffer);
 
+	Buffer temp_buffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, false);
+	context["temp_buffer"]->set(temp_buffer);
+
+	//ray gen programs
+	std::string ptx = ptxPath(std::string("pinhole_camera.cu"));
+	context->setRayGenerationProgram(0, context->createProgramFromPTXFile(ptx, "pinhole_camera"));
+	context->setRayGenerationProgram(1, context->createProgramFromPTXFile(ptx, "clear_temp"));
+	context->setRayGenerationProgram(2, context->createProgramFromPTXFile(ptx, "cumulate_samples"));
+
+	context->setExceptionProgram(0, context->createProgramFromPTXFile(ptx, "exception"));
+	ptx = ptxPath(std::string("constantbg.cu"));
+	context->setMissProgram(0, context->createProgramFromPTXFile(ptx, "miss"));
+	context->setMissProgram(1, context->createProgramFromPTXFile(ptx, "miss_occlusion"));
+
+
 	// Setup programs
 	const std::string cuda_file = std::string(SAMPLE_NAME) + ".cu";
 	const std::string ptx_path = ptxPath(cuda_file);
-	context->setRayGenerationProgram(0, context->createProgramFromPTXFile(ptx_path, "pathtrace_camera"));
-	context->setExceptionProgram(0, context->createProgramFromPTXFile(ptx_path, "exception"));
-	context->setMissProgram(0, context->createProgramFromPTXFile(ptx_path, "miss"));
+	//context->setRayGenerationProgram(0, context->createProgramFromPTXFile(ptx_path, "pathtrace_camera"));
+	//context->setExceptionProgram(0, context->createProgramFromPTXFile(ptx_path, "exception"));
+	//context->setMissProgram(0, context->createProgramFromPTXFile(ptx_path, "miss"));
 
 	context["sqrt_num_samples"]->setUint(sqrt_num_samples);
 	context["bad_color"]->setFloat(1000000.0f, 0.0f, 1000000.0f); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
-	context["bg_color"]->setFloat(make_float3(0.0f));
+	context["bg_color"]->setFloat(make_float3(108.0f / 255.0f, 166.0f / 255.0f, 205.0f / 255.0f) * 0.5f);
+
+	// Build the stratified grid...
+
+	const int grid = 8;
+	const int grid2 = grid * grid;
+	Buffer strat_buffer = context->createBuffer(RT_BUFFER_INPUT);
+	strat_buffer->setFormat(RT_FORMAT_FLOAT2);
+	strat_buffer->setSize(grid2);
+	float *const map = (float *)strat_buffer->map();
+	float *ptr = map;
+	for (int y = 0; y < grid; ++y)
+		for (int x = 0; x < grid; ++x, ptr += 2)
+		{
+			*ptr = ((float)x) / grid;
+			*(ptr + 1) = ((float)y) / grid;
+		}
+
+	strat_buffer->unmap();
+	context["strat_buffer"]->set(strat_buffer);
+
+	context["aRadiusFactor"]->setFloat(0.003f);
+	context["aRadiusAlpha"]->setFloat(0.75f);
 }
 
 
@@ -281,22 +313,22 @@ void loadGeometry(const std::string mesh_file)
 
 
 	// Set up material
-	const std::string cuda_file = std::string(SAMPLE_NAME) + ".cu";
+	const std::string cuda_file = std::string("diffuse") + ".cu";
 	std::string ptx_path = ptxPath(cuda_file);
 	Material diffuse = context->createMaterial();
-	Program diffuse_ch = context->createProgramFromPTXFile(ptx_path, "diffuse");
-	Program diffuse_ah = context->createProgramFromPTXFile(ptx_path, "shadow");
+	Program diffuse_ch = context->createProgramFromPTXFile(ptx_path, "closest_hit_diffuse");
+	Program diffuse_ah = context->createProgramFromPTXFile(ptx_path, "any_hit_occlusion");
 	diffuse->setClosestHitProgram(0, diffuse_ch);
 	diffuse->setAnyHitProgram(1, diffuse_ah);
 
 	// Set up material
 	//const std::string cuda_file = std::string(SAMPLE_NAME) + ".cu";
 	//std::string ptx_path = ptxPath(cuda_file);
-	Material specular = context->createMaterial();
-	Program specular_ch = context->createProgramFromPTXFile(ptx_path, "specular");
-	//Program specular_ah = context->createProgramFromPTXFile(ptx_path, "shadow");
-	specular->setClosestHitProgram(0, specular_ch);
-	//specular->setAnyHitProgram(1, specular_ah);
+	//Material specular = context->createMaterial();
+	//Program specular_ch = context->createProgramFromPTXFile(ptx_path, "specular");
+	////Program specular_ah = context->createProgramFromPTXFile(ptx_path, "shadow");
+	//specular->setClosestHitProgram(0, specular_ch);
+	////specular->setAnyHitProgram(1, specular_ah);
 
 	Material diffuse_light = context->createMaterial();
 	Program diffuse_em = context->createProgramFromPTXFile(ptx_path, "diffuseEmitter");
@@ -478,6 +510,14 @@ void updateCamera()
 	if (camera_changed) // reset accumulation
 		frame_number = 1;
 	camera_changed = false;
+
+	Buffer buffer = context["output_buffer"]->getBuffer();
+	RTsize buffer_width, buffer_height;
+	buffer->getSize(buffer_width, buffer_height);
+
+	Camera cam;
+	cam.Setup(camera_eye, normalize(camera_w), normalize(camera_v), make_float2((float)buffer_width, (float)buffer_height), fov);
+	context["camera"]->setUserData(sizeof(cam), &cam);
 }
 
 
@@ -722,4 +762,3 @@ int main(int argc, char** argv)
 	}
 	SUTIL_CATCH(context->get())
 }
-

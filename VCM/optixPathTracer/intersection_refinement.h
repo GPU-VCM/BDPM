@@ -1,29 +1,22 @@
-/* 
- * Copyright (c) 2016, NVIDIA CORPORATION. All rights reserved.
+
+/*
+ * Copyright (c) 2008 - 2009 NVIDIA Corporation.  All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *  * Neither the name of NVIDIA CORPORATION nor the names of its
- *    contributors may be used to endorse or promote products derived
- *    from this software without specific prior written permission.
+ * NVIDIA Corporation and its licensors retain all intellectual property and proprietary
+ * rights in and to this software, related documentation and any modifications thereto.
+ * Any use, reproduction, disclosure or distribution of this software and related
+ * documentation without an express license agreement from NVIDIA Corporation is strictly
+ * prohibited.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS ``AS IS'' AND ANY
- * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR
- * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
- * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
- * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
- * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THIS SOFTWARE IS PROVIDED *AS IS*
+ * AND NVIDIA AND ITS SUPPLIERS DISCLAIM ALL WARRANTIES, EITHER EXPRESS OR IMPLIED,
+ * INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE.  IN NO EVENT SHALL NVIDIA OR ITS SUPPLIERS BE LIABLE FOR ANY
+ * SPECIAL, INCIDENTAL, INDIRECT, OR CONSEQUENTIAL DAMAGES WHATSOEVER (INCLUDING, WITHOUT
+ * LIMITATION, DAMAGES FOR LOSS OF BUSINESS PROFITS, BUSINESS INTERRUPTION, LOSS OF
+ * BUSINESS INFORMATION, OR ANY OTHER PECUNIARY LOSS) ARISING OUT OF THE USE OF OR
+ * INABILITY TO USE THIS SOFTWARE, EVEN IF NVIDIA HAS BEEN ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGES
  */
 
 #include <optix.h>
@@ -34,7 +27,7 @@
 // that this skips zero denom check (for rays perpindicular to plane normal)
 // since we know that the ray intersects the plane.
 static
-__device__ __inline__ float intersectPlane( const optix::float3& origin,
+__device__ __forceinline__ float intersectPlane( const optix::float3& origin,
                                             const optix::float3& direction,
                                             const optix::float3& normal,
                                             const optix::float3& point )
@@ -45,7 +38,7 @@ __device__ __inline__ float intersectPlane( const optix::float3& origin,
 }
 
 // Offset the hit point using integer arithmetic
-static __device__ __inline__ optix::float3 offset( const optix::float3& hit_point, const optix::float3& normal )
+static __device__ __forceinline__ optix::float3 offset( const optix::float3& hit_point, const optix::float3& normal )
 {
   using namespace optix;
 
@@ -77,7 +70,7 @@ static __device__ __inline__ optix::float3 offset( const optix::float3& hit_poin
 // Refine the hit point to be more accurate and offset it for reflection and
 // refraction ray starting points.
 static
-__device__ __inline__ void refine_and_offset_hitpoint( const optix::float3& original_hit_point, const optix::float3& direction,
+__device__ __forceinline__ void refine_and_offset_hitpoint( const optix::float3& original_hit_point, const optix::float3& direction,
                                                        const optix::float3& normal, const optix::float3& p,
                                                        optix::float3& back_hit_point,
                                                        optix::float3& front_hit_point )
