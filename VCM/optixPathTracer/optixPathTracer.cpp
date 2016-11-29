@@ -218,7 +218,7 @@ void createContext()
 	materials = object = 0;
 	mMaxPathLength = 5;
 	context["mMaxPathLength"]->setInt(10);
-	context->setRayTypeCount(3);
+	context->setRayTypeCount(2);
 	context->setEntryPointCount(3);
 	context->setStackSize(3072);
 
@@ -281,14 +281,20 @@ void createContext()
 
 void createLightBuffer(Mesh model, std::vector<Light> &nlights, const float3 &emissive)
 {
-	for (int i = 0; i < model.num_vertices; ++i){
+	float3* vert = reinterpret_cast<float3*>(model.positions);
+	for (int32_t i = 0; i < model.num_triangles; ++i)
+	{
 		Light vlight;
 		vlight.SetupAreaLight(
-							 make_float3(model.positions[i * 3 + 0]),
-							 make_float3(model.positions[i * 3 + 1]),
-							 make_float3(model.positions[i * 3 + 2]),
-							 emissive
-							);
+			//completely wrong: needs to be the three vertices of the triangle
+			vert[model.tri_indices[i * 3 + 0]],
+			vert[model.tri_indices[i * 3 + 1]],
+			vert[model.tri_indices[i * 3 + 2]],
+			emissive
+			);
+		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 0]].x, vert[model.tri_indices[i * 3 + 0]].y,vert[model.tri_indices[i * 3 + 0]].z);
+		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 1]].x, vert[model.tri_indices[i * 3 + 1]].y,vert[model.tri_indices[i * 3 + 1]].z);
+		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 2]].x, vert[model.tri_indices[i * 3 + 2]].y,vert[model.tri_indices[i * 3 + 2]].z);
 		nlights.push_back(vlight);
 	}
 }
@@ -312,10 +318,17 @@ void loadGeometry(const std::string mesh_file)
 	std::vector<Light> nlights;
 	Mesh model;// = glmReadOBJ("./CornellLight.obj");
 	std::string light_name = std::string(sutil::samplesDir()) + "/data/CornellLight.obj";
-	loadMesh(light_name, model);
+	Matrix4x4 matrix = Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, -1.f, 5.f));
+	const float* xform = matrix.getData();
+	
+	loadMesh(light_name, model, xform);
+	/*float3* positions = reinterpret_cast<float3*>(model.positions);
+	for (int32_t i = 0; i < model.num_triangles; ++i)
+		printf("positions: %f, %f, %f\n", positions[i].x,  positions[i].y,  positions[i].z);*/
+
 	if (lightConditions > 1)
 		createLightBuffer(model, nlights, make_float3(25.03329895614464f, 25.03329895614464f, 25.03329895614464f));
-
+	printf("lights size: %d\n", nlights.size());
 	// Create a buffer for the next-event estimation...
 
 	Buffer m_light_buffer = context->createBuffer(RT_BUFFER_INPUT);
@@ -500,10 +513,11 @@ void loadGeometry(const std::string mesh_file)
 	mesh.context = context;
 	mesh.intersection = tri_intersection;
 	mesh.bounds = tri_bounding_box;
+	mesh.material = material[0];
 	loadMesh(mesh_file, mesh, Matrix4x4::scale(make_float3(3000.f)) * Matrix4x4::translate(make_float3(0.1f, 0.f, 0.1f)));
 	gis.push_back(mesh.geom_instance);
 	//gis.back()->addMaterial(material[0]);
-	gis.back()->addMaterial(material[0]);
+	//gis.back()->addMaterial(material[0]);
 
 	/*OptiXMesh floor;
 	floor.intersection = tri_intersection;
@@ -536,10 +550,10 @@ void loadGeometry(const std::string mesh_file)
 	floor.context = context;
 	floor.intersection = tri_intersection;
 	floor.bounds = tri_bounding_box;
-	
-	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", floor, Matrix4x4::identity() * Matrix4x4::translate(make_float3(0.f, 0.f, 0.f)));
+	floor.material = material[3];
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", floor, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, -1.f, 5.f))/* *Matrix4x4::rotate(1.57f, make_float3(0.f, 1.f, 0.f))*/);
 	gis.push_back(floor.geom_instance);
-	gis.back()->addMaterial(material[3]);
+	//gis.back()->addMaterial(material[3]);
 
 	// Create geometry group
 
@@ -661,7 +675,10 @@ void glutRun()
 void glutDisplay()
 {
 	updateCamera();
+	context->launch(1, width, height);
 	context->launch(0, width, height);
+	context->launch(2, width, height);
+
 
 	sutil::displayBufferGL(getOutputBuffer());
 

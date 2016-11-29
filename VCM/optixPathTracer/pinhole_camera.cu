@@ -137,6 +137,7 @@ __device__ __forceinline__ void GenerateLightSample(SubPathState &oLightState, c
 
 	float emissionPdfW, directPdfW, cosLight;
 	const Light &light = lightBuffer[lightIx];
+	//rtPrintf("lightIX: %d\n",lightIx);
 	oLightState.mThroughput = EmitAreaLight(&light, rndDirSamples, rndPosSamples,
 		oLightState.mOrigin, oLightState.mDirection,
 		emissionPdfW, &directPdfW, &cosLight);
@@ -337,11 +338,13 @@ RT_PROGRAM void clear_temp()
 
 RT_PROGRAM void cumulate_samples()
 {
+	//rtPrintf("here");
 	if (frame_number > 1)
 	{
 		const float a = 1.0f / (float)frame_number;
 		const float b = ((float)frame_number - 1.0f) * a;
 		output_buffer[launch_index] = a * temp_buffer[launch_index] + b * output_buffer[launch_index];
+		
 	}
 	else
 	{
@@ -529,6 +532,7 @@ __device__ __forceinline__ float3 DirectIllumination(
     if (prd_occlusion.occluded)
 		return make_float3(0.0f);
 
+	//rtPrintf("contrib: %f, %f, %f\n", contrib.x, contrib.y, contrib.z);
     return contrib;
 }
 
@@ -614,6 +618,7 @@ __device__ __forceinline__ float3 ConnectVertices(
 
 RT_PROGRAM void pinhole_camera()
 {
+	//rtPrintf("here in pinhole camera");
 #ifdef CONNECT_VERTEXES
 	LightVertex lvertexes[10]; // N.B.: MAXIMUM PATH LENGTH
 #endif
@@ -766,9 +771,10 @@ RT_PROGRAM void pinhole_camera()
             if (prd.mat.isEmitter)
 			{
 				Light light;
-				light.SetupAreaLight(prd.p[0], prd.p[1], prd.p[2], prd.mat.mDiffuseReflectance);
+				light.SetupAreaLight(prd.p[0], prd.p[1], prd.p[2], /*prd.mat.mDiffuseReflectance*/make_float3(25.f));
 				const float3 lrd = GetLightRadiance(0, &light, cameraState, hitPoint, ray.direction);
                 color += cameraState.mThroughput * lrd;
+			
                 break;
             }
 #endif
@@ -783,6 +789,7 @@ RT_PROGRAM void pinhole_camera()
             {
                 color += cameraState.mThroughput *
                     DirectIllumination(cameraState, hitPoint, bsdf, seed);
+				
 
 #ifdef CONNECT_VERTEXES
 				////////////////////////////////////////////////////////////////
@@ -811,6 +818,8 @@ RT_PROGRAM void pinhole_camera()
 
                     color += cameraState.mThroughput * lightVertex.mThroughput *
                         ConnectVertices(lightVertex, bsdf, hitPoint, cameraState);
+					//rtPrintf("camera thruput: %f\n", cameraState.mThroughput);
+					//rtPrintf("light thruput: %f\n", lightVertex.mThroughput);
                 }
 #endif
             }
@@ -818,7 +827,8 @@ RT_PROGRAM void pinhole_camera()
             if (!SampleScattering(bsdf, hitPoint, cameraState, mMisVcWeightFactor, seed))
                 break;
         }
-
+		//rtPrintf("color: %f, %f, %f\n", color.x, color.y, color.z);
+		//color = make_float3(10.4f, 0.f, 0.f);
 		float *const base_output = (float *)&temp_buffer[make_uint2(0, 0)];
 		const uint offset = (launch_index.x + launch_index.y * temp_buffer.size().x) << 2;
 		atomicAdd(base_output + offset,     color.x);
