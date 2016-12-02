@@ -23,10 +23,10 @@ rtDeclareVariable(unsigned int,  frame_number, , );
 rtBuffer<Light>			 lightBuffer;
 rtDeclareVariable(float,         aRadiusFactor, ,);
 rtDeclareVariable(float,	     aRadiusAlpha, ,);
-//rtDeclareVariable(SceneSphere,   mSceneSphere, , );
+
 rtDeclareVariable(Camera,        camera, , );
 rtDeclareVariable(float,         vfov, ,);
-//rtDeclareVariable(int,  backLightIx, , );
+
 rtDeclareVariable(int,  mMaxPathLength, , );
 rtDeclareVariable(uint2, launch_index, rtLaunchIndex, );
 rtDeclareVariable(uint2, launch_dim,   rtLaunchDim, );
@@ -116,8 +116,6 @@ rtCallableProgram(float3, EmitDirectional,
 rtCallableProgram(float3, GetRadianceDirectional, ());
 #else
 #include "AreaLight.h"
-#include "BackgroundLight.h"
-#include "DirectionalLight.h"
 #endif
 
 #ifdef STRATIFIED
@@ -138,27 +136,26 @@ __device__ __forceinline__ void GenerateLightSample(SubPathState &oLightState, c
 	float emissionPdfW, directPdfW, cosLight;
 	const Light &light = lightBuffer[lightIx];
 	//rtPrintf("lightIX: %d\n",lightIx);
-	oLightState.mThroughput = EmitAreaLight(&light, rndDirSamples, rndPosSamples,
-		oLightState.mOrigin, oLightState.mDirection,
+	oLightState.throughput = EmitAreaLight(&light, rndDirSamples, rndPosSamples,
+		oLightState.origin, oLightState.direction,
 		emissionPdfW, &directPdfW, &cosLight);
 
     emissionPdfW *= lightPickProb;
     directPdfW   *= lightPickProb;
 
-    oLightState.mThroughput    /= emissionPdfW;
-    oLightState.mPathLength    = 1;
-    oLightState.mIsFiniteLight = 1;
+    oLightState.throughput    /= emissionPdfW;
+    oLightState.pathlen    = 1;
 
     // Light sub-path MIS quantities. Implements [tech. rep. (31)-(33)] partially.
     // The evaluation is completed after tracing the emission ray in the light sub-path loop.
     // Delta lights are handled as well [tech. rep. (48)-(50)].
     {
-        oLightState.dVCM = Mis(directPdfW / emissionPdfW);
+        oLightState.allMIS = Mis(directPdfW / emissionPdfW);
       
          const float usedCosLight = cosLight;
-         oLightState.dVC = Mis(usedCosLight / emissionPdfW);
+         oLightState.bdptMIS = Mis(usedCosLight / emissionPdfW);
     
-        oLightState.dVM = oLightState.dVC * mMisVcWeightFactor;
+        oLightState.elseMIS = oLightState.bdptMIS * mMisVcWeightFactor;
     }
 }
 
@@ -198,7 +195,7 @@ __device__ __forceinline__ void ConnectToCamera(
     if (isZero(bsdfFactor))
         return;
 
-    bsdfRevPdfW *= aBsdf.mContinuationProb;
+    bsdfRevPdfW *= aBsdf.continuationProb;
 
     // Compute pdf conversion factor from image plane area to surface area
 
@@ -220,7 +217,7 @@ __device__ __forceinline__ void ConnectToCamera(
     // This division also appears a few lines below in the framebuffer accumulation.
 
     const float wLight = Mis(cameraPdfA / mLightSubPathCount) * (
-        /*mMisVmWeightFactor + */aLightState.dVCM + aLightState.dVC * Mis(bsdfRevPdfW));
+        /*mMisVmWeightFactor + */aLightState.allMIS + aLightState.bdptMIS * Mis(bsdfRevPdfW));
 
     // Partial eye sub-path weight is 0 [tech. rep. (47)]
 
@@ -234,7 +231,7 @@ __device__ __forceinline__ void ConnectToCamera(
     // pixel integral is actually defined. We also divide by the number of samples
     // this technique makes, which is equal to the number of light sub-paths
 
-    const float3 contrib = misWeight * aLightState.mThroughput * bsdfFactor /
+    const float3 contrib = misWeight * aLightState.throughput * bsdfFactor /
         (mLightSubPathCount * surfaceToImageFactor);
 
     if (!isZero(contrib))
@@ -271,7 +268,7 @@ __device__ __forceinline__ bool SampleScattering(
     float bsdfDirPdfW, cosThetaOut;
     uint  sampledEvent;
 
-    const float3 bsdfFactor = aBsdf.Sample(rndTriplet, aoState.mDirection,
+    const float3 bsdfFactor = aBsdf.Sample(rndTriplet, aoState.direction,
         bsdfDirPdfW, cosThetaOut, &sampledEvent);
 
     if (isZero(bsdfFactor))
@@ -283,10 +280,10 @@ __device__ __forceinline__ bool SampleScattering(
     // we evaluate the pdf
     float bsdfRevPdfW = bsdfDirPdfW;
     if ((sampledEvent & kSpecular) == 0)
-        bsdfRevPdfW = aBsdf.Pdf(aoState.mDirection, true);
+        bsdfRevPdfW = aBsdf.Pdf(aoState.direction, true);
 
     // Russian roulette
-    const float contProb = aBsdf.mContinuationProb;
+    const float contProb = aBsdf.continuationProb;
     if (rnd(seed) > contProb)
         return false;
 
@@ -300,33 +297,30 @@ __device__ __forceinline__ bool SampleScattering(
     if (sampledEvent & kSpecular)
     {
         // Specular scattering case [tech. rep. (53)-(55)] (partially, as noted above)
-        aoState.dVCM = 0.f;
-        //aoState.dVC *= Mis(cosThetaOut / bsdfDirPdfW) * Mis(bsdfRevPdfW);
-        //aoState.dVM *= Mis(cosThetaOut / bsdfDirPdfW) * Mis(bsdfRevPdfW);
-        //assert(bsdfDirPdfW == bsdfRevPdfW);
-        aoState.dVC *= Mis(cosThetaOut);
-        aoState.dVM *= Mis(cosThetaOut);
+        aoState.allMIS = 0.f;
+        aoState.bdptMIS *= Mis(cosThetaOut);
+        aoState.elseMIS *= Mis(cosThetaOut);
 
-        aoState.mSpecularPath &= 1;
+        aoState.specPath &= 1;
     }
     else
     {
         // Implements [tech. rep. (34)-(36)] (partially, as noted above)
-        aoState.dVC = Mis(cosThetaOut / bsdfDirPdfW) * (
-            aoState.dVC * Mis(bsdfRevPdfW) +
-            aoState.dVCM /*+ mMisVmWeightFactor*/);
+        aoState.bdptMIS = Mis(cosThetaOut / bsdfDirPdfW) * (
+            aoState.bdptMIS * Mis(bsdfRevPdfW) +
+            aoState.allMIS);
 
-        aoState.dVM = Mis(cosThetaOut / bsdfDirPdfW) * (
-            aoState.dVM * Mis(bsdfRevPdfW) +
-            aoState.dVCM * mMisVcWeightFactor + 1.f);
+        aoState.elseMIS = Mis(cosThetaOut / bsdfDirPdfW) * (
+            aoState.elseMIS * Mis(bsdfRevPdfW) +
+            aoState.allMIS * mMisVcWeightFactor + 1.f);
 
-        aoState.dVCM = Mis(1.f / bsdfDirPdfW);
+        aoState.allMIS = Mis(1.f / bsdfDirPdfW);
 
-        aoState.mSpecularPath &= 0;
+        aoState.specPath &= 0;
     }
 
-    aoState.mOrigin  = aHitPoint;
-    aoState.mThroughput *= bsdfFactor * (cosThetaOut / bsdfDirPdfW);
+    aoState.origin  = aHitPoint;
+    aoState.throughput *= bsdfFactor * (cosThetaOut / bsdfDirPdfW);
         
     return true;
 }
@@ -384,17 +378,17 @@ __device__ __forceinline__ float3 GetLightRadiance(
 
     // If we see light source directly from camera, no weighting is required
 
-    if (aCameraState.mPathLength == 1)
+    if (aCameraState.pathlen == 1)
         return radiance;
 
     directPdfA   *= lightPickProb;
     emissionPdfW *= lightPickProb;
 
     // Partial eye sub-path MIS weight [tech. rep. (43)].
-    // If the last hit was specular, then dVCM == 0.
+    // If the last hit was specular, then allMIS == 0.
 
-    const float wCamera = Mis(directPdfA) * aCameraState.dVCM +
-        Mis(emissionPdfW) * aCameraState.dVC;
+    const float wCamera = Mis(directPdfA) * aCameraState.allMIS +
+        Mis(emissionPdfW) * aCameraState.bdptMIS;
 
     // Partial light sub-path weight is 0 [tech. rep. (42)].
 
@@ -430,19 +424,19 @@ __device__ __forceinline__ void GenerateCameraSample(
 
     const float cameraPdfW = imageToSolidAngleFactor;
 
-    oCameraState.mOrigin       = org;
-    oCameraState.mDirection    = dir;
-    oCameraState.mThroughput   = make_float3(1.0f);
+    oCameraState.origin       = org;
+    oCameraState.direction    = dir;
+    oCameraState.throughput   = make_float3(1.0f);
 
-    oCameraState.mPathLength   = 1;
-    oCameraState.mSpecularPath = 1;
+    oCameraState.pathlen   = 1;
+    oCameraState.specPath = 1;
 
     // Eye sub-path MIS quantities. Implements [tech. rep. (31)-(33)] partially.
     // The evaluation is completed after tracing the camera ray in the eye sub-path loop.
 
-    oCameraState.dVCM = Mis(mLightSubPathCount / cameraPdfW);
-    oCameraState.dVC  = 0;
-    oCameraState.dVM  = 0;
+    oCameraState.allMIS = Mis(mLightSubPathCount / cameraPdfW);
+    oCameraState.bdptMIS  = 0;
+    oCameraState.elseMIS  = 0;
 }
 
 // Connects camera vertex to randomly chosen light point.
@@ -482,7 +476,7 @@ __device__ __forceinline__ float3 DirectIllumination(
     if (isZero(bsdfFactor))
         return make_float3(0);
 
-    const float continuationProbability = aBsdf.mContinuationProb;
+    const float continuationProbability = aBsdf.continuationProb;
         
     // If the light is delta light, we can never hit it
     // by BSDF sampling, so the probability of this path is 0
@@ -515,7 +509,7 @@ __device__ __forceinline__ float3 DirectIllumination(
     // multiplied by lightPickProb, so it cancels out.
 
     const float wCamera = Mis(emissionPdfW * cosToLight / (directPdfW * cosAtLight)) * (
-        aCameraState.dVCM + aCameraState.dVC * Mis(bsdfRevPdfW));
+        aCameraState.allMIS + aCameraState.bdptMIS * Mis(bsdfRevPdfW));
 
     // Full path MIS weight [tech. rep. (37)]
     const float misWeight = 1.f / (wLight + 1.f + wCamera);
@@ -546,7 +540,7 @@ __device__ __forceinline__ float3 ConnectVertices(
     const SubPathState     &aCameraState)
 {
     // Get the connection
-    float3 direction   = aLightVertex.mHitpoint - aCameraHitpoint;
+    float3 direction   = aLightVertex.isxPoint - aCameraHitpoint;
     const float dist2 = dot(direction, direction);
     float  distance   = sqrtf(dist2);
     direction        /= distance;
@@ -561,13 +555,13 @@ __device__ __forceinline__ float3 ConnectVertices(
         return make_float3(0.0f);
 
     // Camera continuation probability (for Russian roulette)
-    const float cameraCont = aCameraBsdf.mContinuationProb;
+    const float cameraCont = aCameraBsdf.continuationProb;
     cameraBsdfDirPdfW *= cameraCont;
     cameraBsdfRevPdfW *= cameraCont;
 
     // Evaluate BSDF at light vertex
     float cosLight, lightBsdfDirPdfW, lightBsdfRevPdfW;
-    const float3 lightBsdfFactor = aLightVertex.mBsdf.Evaluate(
+    const float3 lightBsdfFactor = aLightVertex.bsdf.Evaluate(
         -direction, cosLight, &lightBsdfDirPdfW,
         &lightBsdfRevPdfW);
 
@@ -575,7 +569,7 @@ __device__ __forceinline__ float3 ConnectVertices(
         return make_float3(0);
 
     // Light continuation probability (for Russian roulette)
-    const float lightCont = aLightVertex.mBsdf.mContinuationProb;
+    const float lightCont = aLightVertex.bsdf.continuationProb;
     lightBsdfDirPdfW *= lightCont;
     lightBsdfRevPdfW *= lightCont;
 
@@ -590,11 +584,11 @@ __device__ __forceinline__ float3 ConnectVertices(
 
     // Partial light sub-path MIS weight [tech. rep. (40)]
     const float wLight = Mis(cameraBsdfDirPdfA) * (
-        /*mMisVmWeightFactor + */aLightVertex.dVCM + aLightVertex.dVC * Mis(lightBsdfRevPdfW));
+        /*mMisVmWeightFactor + */aLightVertex.allMIS + aLightVertex.bdptMIS * Mis(lightBsdfRevPdfW));
 
     // Partial eye sub-path MIS weight [tech. rep. (41)]
     const float wCamera = Mis(lightBsdfDirPdfA) * (
-        /*mMisVmWeightFactor + */aCameraState.dVCM + aCameraState.dVC * Mis(cameraBsdfRevPdfW));
+        /*mMisVmWeightFactor + */aCameraState.allMIS + aCameraState.bdptMIS * Mis(cameraBsdfRevPdfW));
 
     // Full path MIS weight [tech. rep. (37)]
     const float misWeight = 1.f / (wLight + 1.f + wCamera);
@@ -649,9 +643,9 @@ RT_PROGRAM void pinhole_camera()
         // Trace light path
 
 		int numLightVertex = 0;
-        for (;; ++lightState.mPathLength)
+        for (;; ++lightState.pathlen)
         {
-			const optix::Ray ray = optix::make_Ray(lightState.mOrigin, lightState.mDirection, radiance_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+			const optix::Ray ray = optix::make_Ray(lightState.origin, lightState.direction, radiance_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 			PerRayData_closestHit prd;
 			rtTrace(top_object, ray, prd);
 			if (prd.dist == -1.0f)
@@ -672,28 +666,28 @@ RT_PROGRAM void pinhole_camera()
                 // Infinite lights use MIS handled via solid angle integration,
                 // so do not divide by the distance for such lights [tech. rep. Section 5.1]
 
-                if (lightState.mPathLength > 1 || lightState.mIsFiniteLight == 1)
-                    lightState.dVCM *= Mis(prd.dist * prd.dist);
+                if (lightState.pathlen > 1 || lightState.isLgtFinite == 1)
+                    lightState.allMIS *= Mis(prd.dist * prd.dist);
 
 				const float den = Mis(abs(bsdf.CosThetaFix()));
-                lightState.dVCM /= den;
-                lightState.dVC  /= den;
-                lightState.dVM  /= den;
+                lightState.allMIS /= den;
+                lightState.bdptMIS  /= den;
+                lightState.elseMIS  /= den;
             }
 
             // Store vertex, unless BSDF is purely specular, which prevents
             // vertex connections and merging
-            if (!bsdf.mIsDelta)
+            if (!bsdf.isDelta)
             {
 #ifdef CONNECT_VERTEXES
-				lvertexes[numLightVertex].mHitpoint   = hitPoint;
-                lvertexes[numLightVertex].mThroughput = lightState.mThroughput;
-                lvertexes[numLightVertex].mPathLength = lightState.mPathLength;
-                lvertexes[numLightVertex].mBsdf       = bsdf;
+				lvertexes[numLightVertex].isxPoint   = hitPoint;
+                lvertexes[numLightVertex].throughput = lightState.throughput;
+                lvertexes[numLightVertex].pathlen = lightState.pathlen;
+                lvertexes[numLightVertex].bsdf       = bsdf;
 
-                lvertexes[numLightVertex].dVCM = lightState.dVCM;
-                lvertexes[numLightVertex].dVC  = lightState.dVC;
-                lvertexes[numLightVertex++].dVM  = lightState.dVM;
+                lvertexes[numLightVertex].allMIS = lightState.allMIS;
+                lvertexes[numLightVertex].bdptMIS  = lightState.bdptMIS;
+                lvertexes[numLightVertex++].elseMIS  = lightState.elseMIS;
 #endif
 	            // Connect to camera, unless BSDF is purely specular
 
@@ -701,7 +695,7 @@ RT_PROGRAM void pinhole_camera()
             }
 
             // Terminate if the path would become too long after scattering
-            if (lightState.mPathLength + 2 > mMaxPathLength)
+            if (lightState.pathlen + 2 > mMaxPathLength)
                 break;
 
             // Continue random walk
@@ -719,13 +713,13 @@ RT_PROGRAM void pinhole_camera()
         //////////////////////////////////////////////////////////////////////
         // Trace camera path
 
-        for (;; ++cameraState.mPathLength)
+        for (;; ++cameraState.pathlen)
         {
             // Offset ray origin instead of setting tmin due to numeric
             // issues in ray-sphere intersection. The isect.dist has to be
             // extended by this EPS_RAY after hit point is determined
 
-			const optix::Ray ray = optix::make_Ray(cameraState.mOrigin, cameraState.mDirection, radiance_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+			const optix::Ray ray = optix::make_Ray(cameraState.origin, cameraState.direction, radiance_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 			PerRayData_closestHit prd;
 			rtTrace(top_object, ray, prd);
 
@@ -747,11 +741,11 @@ RT_PROGRAM void pinhole_camera()
             // GenerateLightSample() or SampleScattering(). Implement equations
             // [tech. rep. (31)-(33)] or [tech. rep. (34)-(36)], respectively.
             {
-                cameraState.dVCM *= Mis(prd.dist * prd.dist);
+                cameraState.allMIS *= Mis(prd.dist * prd.dist);
 				const float den = Mis(abs(bsdf.CosThetaFix()));
-                cameraState.dVCM /= den;
-                cameraState.dVC  /= den;
-                cameraState.dVM  /= den;
+                cameraState.allMIS /= den;
+                cameraState.bdptMIS  /= den;
+                cameraState.elseMIS  /= den;
             }
 
             // Light source has been hit; terminate afterwards, since
@@ -764,30 +758,30 @@ RT_PROGRAM void pinhole_camera()
 
 			if (prd.mat.isEmitter)
 			{
-                color += cameraState.mThroughput * lrd;
+                color += cameraState.throughput * lrd;
                 break;
             }
 #else
             if (prd.mat.isEmitter)
 			{
 				Light light;
-				light.SetupAreaLight(prd.p[0], prd.p[1], prd.p[2], /*prd.mat.mDiffuseReflectance*/make_float3(25.f));
+				light.SetupAreaLight(prd.p[0], prd.p[1], prd.p[2], prd.mat.diffusePart);
 				const float3 lrd = GetLightRadiance(0, &light, cameraState, hitPoint, ray.direction);
-                color += cameraState.mThroughput * lrd;
+                color += cameraState.throughput * lrd;
 			
                 break;
             }
 #endif
             // Terminate if eye sub-path is too long for connections or merging
-            if (cameraState.mPathLength >= mMaxPathLength)
+            if (cameraState.pathlen >= mMaxPathLength)
                 break;
 
             ////////////////////////////////////////////////////////////////
             // Vertex connection: Connect to a light source
 
-            if (!bsdf.mIsDelta)
+            if (!bsdf.isDelta)
             {
-                color += cameraState.mThroughput *
+                color += cameraState.throughput *
                     DirectIllumination(cameraState, hitPoint, bsdf, seed);
 				
 
@@ -812,14 +806,14 @@ RT_PROGRAM void pinhole_camera()
                     // Light vertices are stored in increasing path length
                     // order; once we go above the max path length, we can
                     // skip the rest
-                    if (lightVertex.mPathLength + 1 +
-                        cameraState.mPathLength > mMaxPathLength)
+                    if (lightVertex.pathlen + 1 +
+                        cameraState.pathlen > mMaxPathLength)
                         break;
 
-                    color += cameraState.mThroughput * lightVertex.mThroughput *
+                    color += cameraState.throughput * lightVertex.throughput *
                         ConnectVertices(lightVertex, bsdf, hitPoint, cameraState);
-					//rtPrintf("camera thruput: %f\n", cameraState.mThroughput);
-					//rtPrintf("light thruput: %f\n", lightVertex.mThroughput);
+					//rtPrintf("camera thruput: %f\n", cameraState.throughput);
+					//rtPrintf("light thruput: %f\n", lightVertex.throughput);
                 }
 #endif
             }

@@ -318,7 +318,7 @@ void loadGeometry(const std::string mesh_file)
 	std::vector<Light> nlights;
 	Mesh model;// = glmReadOBJ("./CornellLight.obj");
 	std::string light_name = std::string(sutil::samplesDir()) + "/data/CornellLight.obj";
-	Matrix4x4 matrix = Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, -1.f, 5.f));
+	Matrix4x4 matrix = Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 15.f, 5.f));
 	const float* xform = matrix.getData();
 	
 	loadMesh(light_name, model, xform);
@@ -327,7 +327,7 @@ void loadGeometry(const std::string mesh_file)
 		printf("positions: %f, %f, %f\n", positions[i].x,  positions[i].y,  positions[i].z);*/
 
 	if (lightConditions > 1)
-		createLightBuffer(model, nlights, make_float3(25.03329895614464f, 25.03329895614464f, 25.03329895614464f));
+		createLightBuffer(model, nlights, make_float3(250.03329895614464f, 250.03329895614464f, 250.03329895614464f));
 	printf("lights size: %d\n", nlights.size());
 	// Create a buffer for the next-event estimation...
 
@@ -356,52 +356,52 @@ void loadGeometry(const std::string mesh_file)
 
 	material[0]->setClosestHitProgram(0, closest_hit);
 	material[0]->setAnyHitProgram(1, any_hit);
-	TriangleMaterial mat;
+	BaseMaterial mat;
 	mat.Reset();
-	mat.mDiffuseReflectance = make_float3(0.76f, 0.75f, 0.5f);
-	material[0]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+	mat.diffusePart = make_float3(0.76f, 0.75f, 0.5f);
+	material[0]["mat"]->setUserData(sizeof(BaseMaterial), &mat);
 
 	material[1]->setClosestHitProgram(0, closest_hit);
 	material[1]->setAnyHitProgram(1, any_hit);
 	mat.Reset();
-	mat.mDiffuseReflectance = make_float3(0.63f, 0.06f, 0.04f);
-	material[1]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+	mat.diffusePart = make_float3(0.63f, 0.06f, 0.04f);
+	material[1]["mat"]->setUserData(sizeof(BaseMaterial), &mat);
 
 	material[2]->setClosestHitProgram(0, closest_hit);
 	material[2]->setAnyHitProgram(1, any_hit);
 	mat.Reset();
-	mat.mDiffuseReflectance = make_float3(0.15f, 0.48f, 0.09f);
-	material[2]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+	mat.diffusePart = make_float3(0.15f, 0.48f, 0.09f);
+	material[2]["mat"]->setUserData(sizeof(BaseMaterial), &mat);
 
 	// Light material...
 
 	material[3]->setClosestHitProgram(0, closest_hit);
 	material[3]->setAnyHitProgram(1, any_hit);
 	mat.Reset();
-	mat.mDiffuseReflectance = make_float3(0.803922f, 0.803922f, 0.803922f);
+	mat.diffusePart = make_float3(0.803922f, 0.803922f, 0.803922f);
 	mat.isEmitter = true;
-	material[3]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+	material[3]["mat"]->setUserData(sizeof(BaseMaterial), &mat);
 
 	material[4]->setClosestHitProgram(0, closest_hit);
 	material[4]->setAnyHitProgram(1, any_hit);
 	mat.Reset();
-	mat.mMirrorReflectance = make_float3(1, 1, 1);
-	mat.mIOR = 1.6f;
-	material[4]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+	mat.mirror = make_float3(1, 1, 1);
+	mat.ior = 1.6f;
+	material[4]["mat"]->setUserData(sizeof(BaseMaterial), &mat);
 
 	material[5]->setClosestHitProgram(0, closest_hit);
 	material[5]->setAnyHitProgram(1, any_hit);
 	mat.Reset();
-	mat.mDiffuseReflectance = make_float3(0.1, 0.1, 0.1);
-	mat.mPhongReflectance = make_float3(0.7f);
-	mat.mPhongExponent = 90.0f;
-	material[5]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+	mat.diffusePart = make_float3(0.1, 0.1, 0.1);
+	mat.phongPart = make_float3(0.7f);
+	mat.exponent = 90.0f;
+	material[5]["mat"]->setUserData(sizeof(BaseMaterial), &mat);
 
 	material[6]->setClosestHitProgram(0, closest_hit);
 	material[6]->setAnyHitProgram(1, any_hit);
 	mat.Reset();
-	mat.mMirrorReflectance = make_float3(1, 1, 1);
-	material[6]["mat"]->setUserData(sizeof(TriangleMaterial), &mat);
+	mat.mirror = make_float3(1, 1, 1);
+	material[6]["mat"]->setUserData(sizeof(BaseMaterial), &mat);
 
 	// Set up material
 	const std::string cuda_file = std::string("diffuse") + ".cu";
@@ -431,12 +431,14 @@ void loadGeometry(const std::string mesh_file)
 
 
 
-	//// Floor
-	//gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
-	//	make_float3(0.0f, 0.0f, 559.2f),
-	//	make_float3(556.0f, 0.0f, 0.0f)));
+	// Floor
+	gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
+		make_float3(0.0f, 0.0f, 559.2f),
+		make_float3(556.0f, 0.0f, 0.0f)));
 	//gis.back()->addMaterial(material[0]);
-	////setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	gis.back()->setMaterialCount(1);
+	gis.back()->setMaterial(0, material[0]);
 
 	//// Ceiling
 	//gis.push_back(createParallelogram(make_float3(0.0f, 548.8f, 0.0f),
@@ -513,9 +515,18 @@ void loadGeometry(const std::string mesh_file)
 	mesh.context = context;
 	mesh.intersection = tri_intersection;
 	mesh.bounds = tri_bounding_box;
-	mesh.material = material[0];
-	loadMesh(mesh_file, mesh, Matrix4x4::scale(make_float3(3000.f)) * Matrix4x4::translate(make_float3(0.1f, 0.f, 0.1f)));
+	mesh.material = material[4];
+	loadMesh(mesh_file, mesh, Matrix4x4::scale(make_float3(3000.f)) * Matrix4x4::translate(make_float3(0.1f, 0.f, -0.3f)));
 	gis.push_back(mesh.geom_instance);
+
+	//mesh.material = material[0];
+	//loadMesh(std::string(sutil::samplesDir()) + "/data/CornellDiffuse2.obj", mesh, Matrix4x4::rotate(3.1412f, make_float3(0.f, 1.f, 0.f)) * Matrix4x4::scale(make_float3(500.f)) * Matrix4x4::translate(make_float3(-3.4f, 0.f, 5.f)));
+	//gis.push_back(mesh.geom_instance);
+
+	//mesh.material = material[0];
+	//loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", mesh, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 13.f, 5.f))/* *Matrix4x4::rotate(1.57f, make_float3(0.f, 1.f, 0.f))*/);
+	//gis.push_back(mesh.geom_instance);
+
 	//gis.back()->addMaterial(material[0]);
 	//gis.back()->addMaterial(material[0]);
 
@@ -551,7 +562,7 @@ void loadGeometry(const std::string mesh_file)
 	floor.intersection = tri_intersection;
 	floor.bounds = tri_bounding_box;
 	floor.material = material[3];
-	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", floor, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, -1.f, 5.f))/* *Matrix4x4::rotate(1.57f, make_float3(0.f, 1.f, 0.f))*/);
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", floor, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 15.f, 5.f))/* *Matrix4x4::rotate(1.57f, make_float3(0.f, 1.f, 0.f))*/);
 	gis.push_back(floor.geom_instance);
 	//gis.back()->addMaterial(material[3]);
 

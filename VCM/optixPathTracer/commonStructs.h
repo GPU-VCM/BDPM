@@ -29,84 +29,48 @@ class Light
 {
 public:
     __host__ __device__ __forceinline__ void SetupAreaLight(
-        const float3 &aP0,
-        const float3 &aP1,
-        const float3 &aP2,
+        const float3 &v0,
+        const float3 &v1,
+        const float3 &v2,
 		const float3 &emission)
     {
-        p0 = aP0;
-        e1 = aP1 - aP0;
-        e2 = aP2 - aP0;
-		mIntensity = emission;
+        corner = v0;
+        e1 = v1 - v0;
+        e2 = v2 - v0;
+		intensity = emission;
 
         const float3 normal = cross(e1, e2);
         const float len    = length(normal);
-        mInvArea     = 2.f / len;
-        mFrame.SetFromZ(normal);
-		IsDelta = false;
-		IsFinite = true;
-		lightType = 0;
+        invArea     = 2.f / len;
+        frame.SetFromZ(normal);
     }
 
-	__host__ __device__ __forceinline__ void SetupBackgroundLight(
-		const float3 &emission)
-    {
-		mIntensity = emission;
-		IsDelta = IsFinite = false;
-		lightType = 1;
-    }
+	float3 corner, e1, e2;
+    Frame frame;
+    float invArea;
 
-	__host__ __device__ __forceinline__ void SetupDirectionalLight(
-		const float3 &direction,
-		const float3 &emission)
-    {
-		p0 = direction;
-		mFrame.SetFromZ(p0);
-		mIntensity = emission;
-		IsDelta = true;
-		IsFinite = false;
-		lightType = 2;
-    }
-
-	// Area light/Directional light attributes...
-
-    float3 p0, e1, e2;
-    Frame mFrame;
-    float mInvArea;
-
-	// Common attributes...
-
-	float3 mIntensity;
-	bool IsDelta, IsFinite;
-	int lightType; // 0 = AreaLight, 1 = Background, 2 = Directional
+	float3 intensity;
 };
 
-class TriangleMaterial
+class BaseMaterial
 {
 public:
-	// diffuse is simply added to the others
-    float3 mDiffuseReflectance;
+    float3 diffusePart;
 
-	// Is this triangle an emitter?
     bool isEmitter;
     
-	// Phong is simply added to the others
-    float3 mPhongReflectance;
-    float mPhongExponent;
+    float3 phongPart;
+    float exponent;
 
-    // mirror can be either simply added, or mixed using Fresnel term
-    // this is governed by mIOR, if it is >= 0, fresnel is used, otherwise
-    // it is not
-    float3 mMirrorReflectance;
+    float3 mirror;
 
-    // When mIOR >= 0, we also transmit (just clear glass)
-    float mIOR;
+    float ior;
 
 	__host__ void Reset()
     {
-        mDiffuseReflectance = mPhongReflectance = mMirrorReflectance = make_float3(0, 0, 0);
-        mPhongExponent      = 1.f;
-        mIOR = -1.f;
+		diffusePart = phongPart = mirror = make_float3(0, 0, 0);
+		exponent = 1.f;
+		ior = -1.f;
 		isEmitter = false;
     }
 };

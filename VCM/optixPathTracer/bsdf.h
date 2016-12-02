@@ -29,176 +29,155 @@ class BSDF
 {
 public:
 	bool isValid;
-	TriangleMaterial mat;    //!< Id of scene material, < 0 ~ invalid
-    Frame mFrame;            //!< Local frame of reference
-    float3 mLocalDirFix;      //!< Incoming (fixed) direction, in local
-    bool  mIsDelta;          //!< True when material is purely specular
-    ComponentProbabilities mProbabilities; //!< Sampling probabilities
-    float mContinuationProb; //!< Russian roulette probability
-    float mReflectCoeff;     //!< Fresnel reflection coefficient (for glass)
+	BaseMaterial mat; 
+    Frame frame;      
+    float3 localDir;  
+    bool  isDelta;    
+    ComponentProbabilities probabilities;
+    float continuationProb;  
+    float fresnelCoeff;      
 
-	__device__ __forceinline__ float CosThetaFix() const { return mLocalDirFix.z; }
+	__device__ __forceinline__ float CosThetaFix() const { return localDir.z; }
 	__device__ __forceinline__ bool IsValid() const { return isValid; }
 
-	__device__ __forceinline__ void Setup(const optix::Ray &aRay, const PerRayData_closestHit &aIsect)
+	__device__ __forceinline__ void Setup(const optix::Ray &ray, const PerRayData_closestHit &isx)
 	{
-		mFrame.SetFromZ(aIsect.normal);
-		mLocalDirFix = mFrame.ToLocal(-aRay.direction);
-
-		 // reject rays that are too parallel with tangent plane
-        isValid = (abs(mLocalDirFix.z) > EPS_COSINE);
+		frame.SetFromZ(isx.normal);
+		localDir = frame.ToLocal(-ray.direction);
+        isValid = (abs(localDir.z) > EPS_COSINE);
 		if (isValid)
 		{
-			mat = aIsect.mat;
-			GetComponentProbabilities(aIsect.mat);
-			mIsDelta = (mProbabilities.diffProb == 0) && (mProbabilities.phongProb == 0);
+			mat = isx.mat;
+			GetComponentProbabilities(isx.mat);
+			isDelta = (probabilities.diffProb == 0) && (probabilities.phongProb == 0);
 		}
 	}
-
-	// sRGB luminance
-	__device__ __forceinline__ float Luminance(const float3 &aRGB) const
+	__device__ __forceinline__ float Luminance(const float3 &RGB) const
 	{
-		return 0.212671f * aRGB.x +
-			   0.715160f * aRGB.y +
-			   0.072169f * aRGB.z;
+		return 0.212671f * RGB.x +
+			   0.715160f * RGB.y +
+			   0.072169f * RGB.z;
 	}
 
-	__device__ __forceinline__ float AlbedoDiffuse(const TriangleMaterial& aMaterial) const
+	__device__ __forceinline__ float AlbedoDiffuse(const BaseMaterial& material) const
     {
-        return Luminance(aMaterial.mDiffuseReflectance);
+		return Luminance(material.diffusePart);
     }
 
-    __device__ __forceinline__ float AlbedoPhong(const TriangleMaterial& aMaterial) const
+	__device__ __forceinline__ float AlbedoPhong(const BaseMaterial& material) const
     {
-        return Luminance(aMaterial.mPhongReflectance);
+		return Luminance(material.phongPart);
     }
 
-    __device__ __forceinline__ float AlbedoReflect(const TriangleMaterial& aMaterial) const
+	__device__ __forceinline__ float AlbedoReflect(const BaseMaterial& material) const
     {
-        return Luminance(aMaterial.mMirrorReflectance);
+		return Luminance(material.mirror);
     }
 
-    __device__ __forceinline__ float AlbedoRefract(const TriangleMaterial& aMaterial) const
+	__device__ __forceinline__ float AlbedoRefract(const BaseMaterial& material) const
     {
-		return aMaterial.mIOR > 0.f ? 1.f : 0.f;
+		return material.ior > 0.f ? 1.f : 0.f;
     }
 
-	__device__ __forceinline__ void GetComponentProbabilities(const TriangleMaterial &aMaterial)
+	__device__ __forceinline__ void GetComponentProbabilities(const BaseMaterial &material)
     {
-        mReflectCoeff = FresnelDielectric(mLocalDirFix.z, aMaterial.mIOR);
+		fresnelCoeff = FresnelDielectric(localDir.z, material.ior);
 
-        const float albedoDiffuse = AlbedoDiffuse(aMaterial);
-        const float albedoPhong   = AlbedoPhong(aMaterial);
-        const float albedoReflect = mReflectCoeff         * AlbedoReflect(aMaterial);
-        const float albedoRefract = (1.f - mReflectCoeff) * AlbedoRefract(aMaterial);
+		const float albedoDiffuse = AlbedoDiffuse(material);
+		const float albedoPhong = AlbedoPhong(material);
+		const float albedoReflect = fresnelCoeff         * AlbedoReflect(material);
+		const float albedoRefract = (1.f - fresnelCoeff) * AlbedoRefract(material);
 
         const float totalAlbedo = albedoDiffuse + albedoPhong + albedoReflect + albedoRefract;
 
         if (totalAlbedo < 1e-9f)
         {
-            mProbabilities.diffProb  = 0.f;
-            mProbabilities.phongProb = 0.f;
-            mProbabilities.reflProb  = 0.f;
-            mProbabilities.refrProb  = 0.f;
-            mContinuationProb = 0.f;
+            probabilities.diffProb  = 0.f;
+            probabilities.phongProb = 0.f;
+            probabilities.reflProb  = 0.f;
+            probabilities.refrProb  = 0.f;
+            continuationProb = 0.f;
         }
         else
         {
-            mProbabilities.diffProb  = albedoDiffuse / totalAlbedo;
-            mProbabilities.phongProb = albedoPhong   / totalAlbedo;
-            mProbabilities.reflProb  = albedoReflect / totalAlbedo;
-            mProbabilities.refrProb  = albedoRefract / totalAlbedo;
-            // The continuation probability is max component from reflectance.
-            // That way the weight of sample will never rise.
-            // Luminance is another very valid option.
-            mContinuationProb =
-                maximum(aMaterial.mDiffuseReflectance +
-						aMaterial.mPhongReflectance +
-					    mReflectCoeff * aMaterial.mMirrorReflectance) +
-			    (1.f - mReflectCoeff);
+            probabilities.diffProb  = albedoDiffuse / totalAlbedo;
+            probabilities.phongProb = albedoPhong   / totalAlbedo;
+            probabilities.reflProb  = albedoReflect / totalAlbedo;
+            probabilities.refrProb  = albedoRefract / totalAlbedo;
+            
+            continuationProb =
+				maximum(material.diffusePart +
+						material.phongPart +
+						fresnelCoeff * material.mirror) +
+			    (1.f - fresnelCoeff);
 
-            mContinuationProb = min(1.f, max(0.f, mContinuationProb));
+            continuationProb = min(1.f, max(0.f, continuationProb));
         }
     }
-
-	// reflect vector through (0,0,1)
-	__device__ __forceinline__ float3 ReflectLocal(const float3& aVector) const
+	__device__ __forceinline__ float3 ReflectLocal(const float3& vec) const
 	{
-		return make_float3(-aVector.x, -aVector.y, aVector.z);
+		return make_float3(-vec.x, -vec.y, vec.z);
 	}
 
 	__device__ __forceinline__ float PowerCosHemispherePdfW(
-		const float3  &aNormal,
-		const float3  &aDirection,
-		const float  aPower) const
+		const float3  &nor,
+		const float3  &dir,
+		const float  power) const
 	{
-		const float cosTheta = max(0.f, dot(aNormal, aDirection));
+		const float cosTheta = max(0.f, dot(nor, dir));
 
-		return (aPower + 1.f) * pow(cosTheta, aPower) * (INV_PI_F * 0.5f);
+		return (power + 1.f) * pow(cosTheta, power) * (INV_PI_F * 0.5f);
 	}
 
-	////////////////////////////////////////////////////////////////////////////
-    // Sampling methods
-    // All sampling methods take material, 2 random numbers [0-1[,
-    // and return BSDF factor, generated direction in local coordinates, and PDF
-    ////////////////////////////////////////////////////////////////////////////
-
 	__device__ __forceinline__ float3 SampleDiffuse(
-        const TriangleMaterial &aMaterial,
-        const float2    &aRndTuple,
-        float3          &oLocalDirGen,
-        float           &oPdfW) const
+		const BaseMaterial &material,
+        const float2    &rnd2,
+        float3          &localdirNew,
+        float           &pdf) const
     {
-        if (mLocalDirFix.z < EPS_COSINE)
+        if (localDir.z < EPS_COSINE)
             return make_float3(0.0f, 0.0f, 0.0f);
 
         float unweightedPdfW;
-        oLocalDirGen = SampleCosHemisphereW(aRndTuple, &unweightedPdfW);
-        oPdfW += unweightedPdfW * mProbabilities.diffProb;
+		localdirNew = SampleCosHemisphereW(rnd2, &unweightedPdfW);
+        pdf += unweightedPdfW * probabilities.diffProb;
 
-        return aMaterial.mDiffuseReflectance * INV_PI_F;
+        return material.diffusePart * INV_PI_F;
     }
 
-	
-	////////////////////////////////////////////////////////////////////////////
-    // Evaluation methods
-    ////////////////////////////////////////////////////////////////////////////
-
     __device__ __forceinline__ float3 EvaluateDiffuse(
-        const TriangleMaterial &aMaterial,
-        const float3    &aLocalDirGen,
-        float          *oDirectPdfW = NULL,
-        float          *oReversePdfW = NULL) const
+		const BaseMaterial &material,
+        const float3    &localdirNew,
+        float          *dirPdf = NULL,
+        float          *revPdf = NULL) const
     {
-        if(mProbabilities.diffProb == 0)
+        if(probabilities.diffProb == 0)
             return make_float3(0.0f, 0.0f, 0.0f);
 
-        if(mLocalDirFix.z < EPS_COSINE || aLocalDirGen.z < EPS_COSINE)
+		if (localDir.z < EPS_COSINE || localdirNew.z < EPS_COSINE)
             return make_float3(0.0f, 0.0f, 0.0f);
 
-        if(oDirectPdfW)
-            *oDirectPdfW += mProbabilities.diffProb * max(0.f, aLocalDirGen.z * INV_PI_F);
+		if (dirPdf)
+			*dirPdf += probabilities.diffProb * max(0.f, localdirNew.z * INV_PI_F);
 
-        if(oReversePdfW)
-            *oReversePdfW += mProbabilities.diffProb * max(0.f, mLocalDirFix.z * INV_PI_F);
+		if (revPdf)
+			*revPdf += probabilities.diffProb * max(0.f, localdirNew.z * INV_PI_F);
 
-        return aMaterial.mDiffuseReflectance * INV_PI_F;
+        return material.diffusePart * INV_PI_F;
     }
 
 	__device__ __forceinline__ float3 EvaluatePhong(
-		const TriangleMaterial &aMaterial,
+		const BaseMaterial &aMaterial,
 		const float3    &aLocalDirGen,
 		float          *oDirectPdfW = NULL,
 		float          *oReversePdfW = NULL) const
 	{
-		if (mProbabilities.phongProb == 0)
+		if (probabilities.phongProb == 0)
 			return make_float3(0.0f, 0.0f, 0.0f);
 
-		if (mLocalDirFix.z < EPS_COSINE || aLocalDirGen.z < EPS_COSINE)
+		if (localDir.z < EPS_COSINE || aLocalDirGen.z < EPS_COSINE)
 			return make_float3(0.0f, 0.0f, 0.0f);
-
-		// assumes this is never called when rejectShadingCos(oLocalDirGen.z) is true
-		const float3 reflLocalDirIn = ReflectLocal(mLocalDirFix);
+		const float3 reflLocalDirIn = ReflectLocal(localDir);
 		const float dot_R_Wi = dot(reflLocalDirIn, aLocalDirGen);
 
 		if (dot_R_Wi <= EPS_PHONG)
@@ -207,8 +186,8 @@ public:
 		if (oDirectPdfW || oReversePdfW)
 		{
 			// the sampling is symmetric
-			const float pdfW = mProbabilities.phongProb *
-				PowerCosHemispherePdfW(reflLocalDirIn, aLocalDirGen, aMaterial.mPhongExponent);
+			const float pdfW = probabilities.phongProb *
+				PowerCosHemispherePdfW(reflLocalDirIn, aLocalDirGen, aMaterial.exponent);
 
 			if (oDirectPdfW)
 				*oDirectPdfW  += pdfW;
@@ -217,21 +196,11 @@ public:
 				*oReversePdfW += pdfW;
 		}
 
-		const float3 rho = aMaterial.mPhongReflectance *
-			(aMaterial.mPhongExponent + 2.f) * 0.5f * INV_PI_F;
+		const float3 rho = aMaterial.phongPart *
+			(aMaterial.exponent + 2.f) * 0.5f * INV_PI_F;
 
-		return rho * pow(dot_R_Wi, aMaterial.mPhongExponent);
+		return rho * pow(dot_R_Wi, aMaterial.exponent);
 	}
-
-	/* \brief Given a direction, evaluates BSDF
-     *
-     * Returns value of BSDF, as well as cosine for the
-     * aWorldDirGen direction.
-     * Can return probability (w.r.t. solid angle W),
-     * of having sampled aWorldDirGen given mLocalDirFix (oDirectPdfW),
-     * and of having sampled mLocalDirFix given aWorldDirGen (oReversePdfW).
-     *
-     */
     __device__ __forceinline__ float3 Evaluate(
         const float3 &aWorldDirGen,
         float       &oCosThetaGen,
@@ -243,9 +212,9 @@ public:
         if (oDirectPdfW)  *oDirectPdfW = 0;
         if (oReversePdfW) *oReversePdfW = 0;
 
-        const float3 localDirGen = mFrame.ToLocal(aWorldDirGen);
+        const float3 localDirGen = frame.ToLocal(aWorldDirGen);
 
-        if (localDirGen.z * mLocalDirFix.z < 0)
+        if (localDirGen.z * localDir.z < 0)
             return result;
 
         oCosThetaGen = abs(localDirGen.z);
@@ -257,34 +226,33 @@ public:
     }
 
 	__device__ __forceinline__ void PdfDiffuse(
-        const TriangleMaterial &aMaterial,
+        const BaseMaterial &aMaterial,
         const float3    &aLocalDirGen,
         float          *oDirectPdfW = NULL,
         float          *oReversePdfW = NULL) const
     {
-        if (mProbabilities.diffProb == 0)
+        if (probabilities.diffProb == 0)
             return;
 
         if (oDirectPdfW)
-            *oDirectPdfW  += mProbabilities.diffProb *
+            *oDirectPdfW  += probabilities.diffProb *
             max(0.f, aLocalDirGen.z * INV_PI_F);
 
         if (oReversePdfW)
-            *oReversePdfW += mProbabilities.diffProb *
-            max(0.f, mLocalDirFix.z * INV_PI_F);
+            *oReversePdfW += probabilities.diffProb *
+            max(0.f, localDir.z * INV_PI_F);
     }
 
 	__device__ __forceinline__ void PdfPhong(
-        const TriangleMaterial &aMaterial,
+        const BaseMaterial &aMaterial,
         const float3    &aLocalDirGen,
         float          *oDirectPdfW = NULL,
         float          *oReversePdfW = NULL) const
     {
-        if (mProbabilities.phongProb == 0)
+        if (probabilities.phongProb == 0)
             return;
 
-        // assumes this is never called when rejectShadingCos(oLocalDirGen.z) is true
-        const float3 reflLocalDirIn = ReflectLocal(mLocalDirFix);
+        const float3 reflLocalDirIn = ReflectLocal(localDir);
         const float dot_R_Wi = dot(reflLocalDirIn, aLocalDirGen);
 
         if(dot_R_Wi <= EPS_PHONG)
@@ -292,9 +260,8 @@ public:
 
         if(oDirectPdfW || oReversePdfW)
         {
-            // the sampling is symmetric
             const float pdfW = PowerCosHemispherePdfW(reflLocalDirIn, aLocalDirGen,
-                aMaterial.mPhongExponent) * mProbabilities.phongProb;
+                aMaterial.exponent) * probabilities.phongProb;
 
             if(oDirectPdfW)
                 *oDirectPdfW  += pdfW;
@@ -325,16 +292,13 @@ public:
 	}
 
 	__device__ __forceinline__ float3 SamplePhong(
-        const TriangleMaterial &aMaterial,
+        const BaseMaterial &aMaterial,
         const float2    &aRndTuple,
         float3          &oLocalDirGen,
         float          &oPdfW) const
     {
-        oLocalDirGen = SamplePowerCosHemisphereW(aRndTuple, aMaterial.mPhongExponent, NULL);
-
-        // Due to numeric issues in MIS, we actually need to compute all pdfs
-        // exactly the same way all the time!!!
-        const float3 reflLocalDirFixed = ReflectLocal(mLocalDirFix);
+        oLocalDirGen = SamplePowerCosHemisphereW(aRndTuple, aMaterial.exponent, NULL);
+        const float3 reflLocalDirFixed = ReflectLocal(localDir);
         {
             Frame frame;
             frame.SetFromZ(reflLocalDirFixed);
@@ -348,90 +312,76 @@ public:
 
         PdfPhong(aMaterial, oLocalDirGen, &oPdfW);
 
-        const float3 rho = aMaterial.mPhongReflectance *
-            (aMaterial.mPhongExponent + 2.f) * 0.5f * INV_PI_F;
+        const float3 rho = aMaterial.phongPart *
+            (aMaterial.exponent + 2.f) * 0.5f * INV_PI_F;
 
-        return rho * pow(dot_R_Wi, aMaterial.mPhongExponent);
+        return rho * pow(dot_R_Wi, aMaterial.exponent);
     }
 
     __device__ __forceinline__ float3 SampleReflect(
-        const TriangleMaterial &aMaterial,
+        const BaseMaterial &aMaterial,
         const float2    &aRndTuple,
         float3          &oLocalDirGen,
         float          &oPdfW) const
     {
-        oLocalDirGen = ReflectLocal(mLocalDirFix);
+        oLocalDirGen = ReflectLocal(localDir);
 
-        oPdfW += mProbabilities.reflProb;
-        // BSDF is multiplied (outside) by cosine (oLocalDirGen.z),
-        // for mirror this shouldn't be done, so we pre-divide here instead
-        return mReflectCoeff * aMaterial.mMirrorReflectance /
+        oPdfW += probabilities.reflProb;
+        return fresnelCoeff * aMaterial.mirror /
             abs(oLocalDirGen.z);
     }
 
     __device__ __forceinline__ float3 SampleRefract(
-        const TriangleMaterial &aMaterial,
+        const BaseMaterial &aMaterial,
         const float2    &aRndTuple,
         float3          &oLocalDirGen,
         float          &oPdfW) const
     {
-        if(aMaterial.mIOR < 0)
+        if(aMaterial.ior < 0)
             return make_float3(0.0f, 0.0f, 0.0f);
 
-        float cosI = mLocalDirFix.z;
+        float cosI = localDir.z;
 
         float cosT;
         float etaIncOverEtaTrans;
 
-        if(cosI < 0.f) // hit from inside
+        if(cosI < 0.f) 
         {
-            etaIncOverEtaTrans = aMaterial.mIOR;
+            etaIncOverEtaTrans = aMaterial.ior;
             cosI = -cosI;
             cosT = 1.f;
         }
         else
         {
-            etaIncOverEtaTrans = 1.f / aMaterial.mIOR;
+            etaIncOverEtaTrans = 1.f / aMaterial.ior;
             cosT = -1.f;
         }
 
         const float sinI2 = 1.f - cosI * cosI;
         const float sinT2 = (etaIncOverEtaTrans * etaIncOverEtaTrans) * sinI2;
 
-        if(sinT2 < 1.f) // no total internal reflection
+        if(sinT2 < 1.f) 
         {
             cosT *= sqrtf(max(0.f, 1.f - sinT2));
 
             oLocalDirGen = make_float3(
-                -etaIncOverEtaTrans * mLocalDirFix.x,
-                -etaIncOverEtaTrans * mLocalDirFix.y,
+                -etaIncOverEtaTrans * localDir.x,
+                -etaIncOverEtaTrans * localDir.y,
                 cosT);
 
-            oPdfW += mProbabilities.refrProb;
+            oPdfW += probabilities.refrProb;
 
-            const float refractCoeff = 1.f - mReflectCoeff;
-            // only camera paths are multiplied by this factor, and etas
-            // are swapped because radiance flows in the opposite direction
+            const float refractCoeff = 1.f - fresnelCoeff;
             if(!FixIsLight)
                 return make_float3(refractCoeff * (etaIncOverEtaTrans * etaIncOverEtaTrans) / abs(cosT));
             else
                 return make_float3(refractCoeff / abs(cosT));
         }
-        //else total internal reflection, do nothing
 
         oPdfW += 0.f;
         return make_float3(0.0f, 0.0f, 0.0f);
     }
 
-	/* \brief Given 3 random numbers, samples new direction from BSDF.
-     *
-     * Uses z component of random triplet to pick BSDF component from
-     * which it will sample direction. If non-specular component is chosen,
-     * it will also evaluate the other (non-specular) BSDF components.
-     * Return BSDF factor for given direction, as well as PDF choosing that direction.
-     * Can return event which has been sampled.
-     * If result is Vec3f(0,0,0), then the sample should be discarded.
-     */
     __device__ __forceinline__ float3 Sample(
         const float3 &aRndTriplet,
         float3       &oWorldDirGen,
@@ -441,11 +391,11 @@ public:
     {
         uint sampledEvent;
 
-        if (aRndTriplet.z < mProbabilities.diffProb)
+        if (aRndTriplet.z < probabilities.diffProb)
             sampledEvent = kDiffuse;
-        else if (aRndTriplet.z < mProbabilities.diffProb + mProbabilities.phongProb)
+        else if (aRndTriplet.z < probabilities.diffProb + probabilities.phongProb)
             sampledEvent = kPhong;
-        else if (aRndTriplet.z < mProbabilities.diffProb + mProbabilities.phongProb + mProbabilities.reflProb)
+        else if (aRndTriplet.z < probabilities.diffProb + probabilities.phongProb + probabilities.reflProb)
             sampledEvent = kReflect;
         else
             sampledEvent = kRefract;
@@ -495,23 +445,17 @@ public:
         if (oCosThetaGen < EPS_COSINE)
             return make_float3(0.0f, 0.0f, 0.0f);
 
-        oWorldDirGen = mFrame.ToWorld(localDirGen);
+        oWorldDirGen = frame.ToWorld(localDirGen);
         return result;
     }
 
-    /* \brief Given a direction, evaluates Pdf
-     *
-     * By default returns PDF with which would be aWorldDirGen
-     * generated from mLocalDirFix. When aEvalRevPdf == true,
-     * it provides PDF for the reverse direction.
-     */
     __device__ __forceinline__ float Pdf(
         const float3 &aWorldDirGen,
         const bool aEvalRevPdf = false) const
     {
-        const float3 localDirGen = mFrame.ToLocal(aWorldDirGen);
+        const float3 localDirGen = frame.ToLocal(aWorldDirGen);
 
-        if (localDirGen.z * mLocalDirFix.z < 0)
+        if (localDirGen.z * localDir.z < 0)
             return 0;
 
         float directPdfW  = 0;
@@ -524,40 +468,38 @@ public:
     }
 };
 
-// The sole point of this structure is to make carrying around the ray baggage easier.
 struct SubPathState
 {
-    float3 mOrigin;             // Path origin
-    float3 mDirection;          // Where to go next
-    float3 mThroughput;         // Path throughput
-    uint  mPathLength    : 30; // Number of path segments, including this
-    uint  mIsFiniteLight :  1; // Just generate by finite light
-    uint  mSpecularPath  :  1; // All scattering events so far were specular
+    float3 origin;        
+    float3 direction;     
+    float3 throughput;    
+    uint  pathlen    : 30;
+	uint  isLgtFinite : 1;
+    uint  specPath  :  1; 
 
-    float dVCM; // MIS quantity used for vertex connection and merging
-    float dVC;  // MIS quantity used for vertex connection
-    float dVM;  // MIS quantity used for vertex merging
+    float allMIS; 
+    float bdptMIS;
+    float elseMIS;
 };
 
-// Path vertex, used for merging and connection
+
 template<bool tFromLight>
 struct PathVertex
 {
-    float3 mHitpoint;   // Position of the vertex
-    float3 mThroughput; // Path throughput (including emission)
-    uint  mPathLength; // Number of segments between source and vertex
+    float3 isxPoint;  
+    float3 throughput;
+    uint  pathlen; 
 
-    // Stores all required local information, including incoming direction.
-    BSDF<tFromLight> mBsdf;
+  
+    BSDF<tFromLight> bsdf;
 
-    float dVCM; // MIS quantity used for vertex connection and merging
-    float dVC;  // MIS quantity used for vertex connection
-    float dVM;  // MIS quantity used for vertex merging
+    float allMIS; 
+    float bdptMIS;
+    float elseMIS;
 
-    // Used by HashGrid
     const float3 &GetPosition() const
     {
-        return mHitpoint;
+        return isxPoint;
     }
 };
 

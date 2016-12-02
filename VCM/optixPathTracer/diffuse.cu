@@ -8,7 +8,7 @@ rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 rtDeclareVariable(float, t_hit, rtIntersectionDistance, );
 rtDeclareVariable(PerRayData_closestHit, prd, rtPayload, );
 rtDeclareVariable(PerRayData_occlusion, prd_occlusion, rtPayload, );
-rtDeclareVariable(TriangleMaterial,          mat, , );
+rtDeclareVariable(BaseMaterial,          mat, , );
 
 using namespace optix;
 

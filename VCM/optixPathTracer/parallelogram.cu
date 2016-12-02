@@ -31,16 +31,20 @@
 using namespace optix;
 
 rtDeclareVariable(float4, plane, , );
-rtDeclareVariable(float3, v1, , );
-rtDeclareVariable(float3, v2, , );
+rtDeclareVariable(float3, p1, , );
+rtDeclareVariable(float3, p2, , );
 rtDeclareVariable(float3, anchor, , );
 rtDeclareVariable(int, lgt_instance, , ) = { -1 };
+//rtBuffer<int>    material_buffer;
 
 rtDeclareVariable(float3, texcoord, attribute texcoord, );
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, );
 rtDeclareVariable(float3, shading_normal, attribute shading_normal, );
 rtDeclareVariable(int, lgt_idx, attribute lgt_idx, );
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
+rtDeclareVariable(float3, v1, attribute v1, );
+rtDeclareVariable(float3, v2, attribute v2, );
+rtDeclareVariable(float3, v3, attribute v3, );
 
 RT_PROGRAM void intersect(int primIdx)
 {
@@ -50,11 +54,14 @@ RT_PROGRAM void intersect(int primIdx)
 	if (t > ray.tmin && t < ray.tmax) {
 		float3 p = ray.origin + ray.direction * t;
 		float3 vi = p - anchor;
-		float a1 = dot(v1, vi);
+		float a1 = dot(p1, vi);
 		if (a1 >= 0 && a1 <= 1){
-			float a2 = dot(v2, vi);
+			float a2 = dot(p2, vi);
 			if (a2 >= 0 && a2 <= 1){
 				if (rtPotentialIntersection(t)) {
+					v1 = anchor;
+					v2 = anchor + p1;
+					v3 = anchor + p2;
 					shading_normal = geometric_normal = n;
 					texcoord = make_float3(a1, a2, 0);
 					lgt_idx = lgt_instance;
@@ -67,9 +74,9 @@ RT_PROGRAM void intersect(int primIdx)
 
 RT_PROGRAM void bounds(int, float result[6])
 {
-	// v1 and v2 are scaled by 1./length^2.  Rescale back to normal for the bounds computation.
-	const float3 tv1 = v1 / dot(v1, v1);
-	const float3 tv2 = v2 / dot(v2, v2);
+	// p1 and p2 are scaled by 1./length^2.  Rescale back to normal for the bounds computation.
+	const float3 tv1 = p1 / dot(p1, p1);
+	const float3 tv2 = p2 / dot(p2, p2);
 	const float3 p00 = anchor;
 	const float3 p01 = anchor + tv1;
 	const float3 p10 = anchor + tv2;

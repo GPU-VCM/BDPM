@@ -49,8 +49,7 @@ if(GLUT_FOUND AND OPENGL_FOUND)
 		pinhole_camera.cu
 		triangle_mesh_iterative.cu
 		utils.h
-
-       
+		parallelogram.cu
         )
 else()
     # GLUT or OpenGL not found

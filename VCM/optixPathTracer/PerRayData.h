@@ -6,7 +6,7 @@ struct PerRayData_closestHit
 {
 	float dist;
 	float3 normal, p[3];
-	TriangleMaterial mat;
+	BaseMaterial mat;
 };
 
 struct PerRayData_occlusion
