@@ -17,10 +17,10 @@ CALLABLE float3 IlluminateAreaLight(
 	DtL = DtL / dist;
 
 	const float cosNormalDir = dot(light->frame.Normal(), -DtL);
-	/*if (cosNormalDir < EPS_COSINE)
+	if (cosNormalDir < EPS_COSINE)
 	{
 		return make_float3(0.0f, 0.0f, 0.0f);
-	}*/
+	}
 
 	dirPdf = light->invArea * distSqr / cosNormalDir;
 	*costheta = cosNormalDir;

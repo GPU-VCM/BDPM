@@ -292,9 +292,9 @@ void createLightBuffer(Mesh model, std::vector<Light> &nlights, const float3 &em
 			vert[model.tri_indices[i * 3 + 2]],
 			emissive
 			);
-		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 0]].x, vert[model.tri_indices[i * 3 + 0]].y,vert[model.tri_indices[i * 3 + 0]].z);
+		/*printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 0]].x, vert[model.tri_indices[i * 3 + 0]].y,vert[model.tri_indices[i * 3 + 0]].z);
 		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 1]].x, vert[model.tri_indices[i * 3 + 1]].y,vert[model.tri_indices[i * 3 + 1]].z);
-		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 2]].x, vert[model.tri_indices[i * 3 + 2]].y,vert[model.tri_indices[i * 3 + 2]].z);
+		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 2]].x, vert[model.tri_indices[i * 3 + 2]].y,vert[model.tri_indices[i * 3 + 2]].z);*/
 		nlights.push_back(vlight);
 	}
 }
@@ -328,7 +328,7 @@ void loadGeometry(const std::string mesh_file)
 
 	if (lightConditions > 1)
 		createLightBuffer(model, nlights, make_float3(250.03329895614464f, 250.03329895614464f, 250.03329895614464f));
-	printf("lights size: %d\n", nlights.size());
+
 	// Create a buffer for the next-event estimation...
 
 	Buffer m_light_buffer = context->createBuffer(RT_BUFFER_INPUT);
@@ -431,14 +431,14 @@ void loadGeometry(const std::string mesh_file)
 
 
 
-	// Floor
-	gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
-		make_float3(0.0f, 0.0f, 559.2f),
-		make_float3(556.0f, 0.0f, 0.0f)));
-	//gis.back()->addMaterial(material[0]);
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	gis.back()->setMaterialCount(1);
-	gis.back()->setMaterial(0, material[0]);
+	//// Floor
+	//gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
+	//	make_float3(0.0f, 0.0f, 559.2f),
+	//	make_float3(556.0f, 0.0f, 0.0f)));
+	////gis.back()->addMaterial(material[0]);
+	////setMaterial(gis.back(), diffuse, "diffuse_color", white);
+	//gis.back()->setMaterialCount(1);
+	//gis.back()->setMaterial(0, material[0]);
 
 	//// Ceiling
 	//gis.push_back(createParallelogram(make_float3(0.0f, 548.8f, 0.0f),
@@ -519,13 +519,13 @@ void loadGeometry(const std::string mesh_file)
 	loadMesh(mesh_file, mesh, Matrix4x4::scale(make_float3(3000.f)) * Matrix4x4::translate(make_float3(0.1f, 0.f, -0.3f)));
 	gis.push_back(mesh.geom_instance);
 
-	//mesh.material = material[0];
-	//loadMesh(std::string(sutil::samplesDir()) + "/data/CornellDiffuse2.obj", mesh, Matrix4x4::rotate(3.1412f, make_float3(0.f, 1.f, 0.f)) * Matrix4x4::scale(make_float3(500.f)) * Matrix4x4::translate(make_float3(-3.4f, 0.f, 5.f)));
-	//gis.push_back(mesh.geom_instance);
+	mesh.material = material[0];
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellDiffuse2.obj", mesh, Matrix4x4::rotate(3.1412f, make_float3(0.f, 1.f, 0.f)) * Matrix4x4::scale(make_float3(500.f)) * Matrix4x4::translate(make_float3(-3.4f, 0.f, 5.f)));
+	gis.push_back(mesh.geom_instance);
 
-	//mesh.material = material[0];
-	//loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", mesh, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 13.f, 5.f))/* *Matrix4x4::rotate(1.57f, make_float3(0.f, 1.f, 0.f))*/);
-	//gis.push_back(mesh.geom_instance);
+	mesh.material = material[0];
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", mesh, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 13.f, 5.f))/* *Matrix4x4::rotate(1.57f, make_float3(0.f, 1.f, 0.f))*/);
+	gis.push_back(mesh.geom_instance);
 
 	//gis.back()->addMaterial(material[0]);
 	//gis.back()->addMaterial(material[0]);
