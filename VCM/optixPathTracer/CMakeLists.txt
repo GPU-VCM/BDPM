@@ -50,6 +50,7 @@ if(GLUT_FOUND AND OPENGL_FOUND)
 		triangle_mesh_iterative.cu
 		utils.h
 		parallelogram.cu
+		EventTimer.h
         )
 else()
     # GLUT or OpenGL not found

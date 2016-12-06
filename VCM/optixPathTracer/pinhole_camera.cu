@@ -3,10 +3,11 @@
 #include "random.h"
 #include "BSDF.h"
 #include "Camera.h"
+#include "EventTimer.h"
 
 using namespace optix;
 
-//#define STRATIFIED
+#define STRATIFIED
 
 rtDeclareVariable(float3,        eye, , );
 rtDeclareVariable(float3,        U, , );
@@ -32,39 +33,11 @@ rtDeclareVariable(uint2, launch_index, rtLaunchIndex, );
 rtDeclareVariable(uint2, launch_dim,   rtLaunchDim, );
 rtDeclareVariable(float, time_view_scale, , ) = 1e-6f;
 
+rtBuffer<int, 1> raysTracedThisFrame; // should allow for a buffer with room for one integer
+
+//#define USE_CALLABLE_PROGRAM
+
 #ifdef USE_CALLABLE_PROGRAM
-rtCallableProgram(float3, IlluminateBackground,
-		(const Light *const light,
-		 const float		   mInvSceneRadiusSqr,
-         const float3       &aReceivingPosition,
-         const float2       &aRndTuple,
-         float3             &oDirectionToLight,
-         float              &oDistance,
-         float              &oDirectPdfW,
-         float              *oEmissionPdfW,
-         float              *oCosAtLight));
-
-rtCallableProgram(float3, EmitBackground,
-	    (const Light *const light,
-         const float3      mSceneCenter,
-		 const float       mSceneRadius,
-		 const float		  mInvSceneRadiusSqr,
-         const float2      &aDirRndTuple,
-         const float2      &aPosRndTuple,
-         float3            &oPosition,
-         float3            &oDirection,
-         float             &oEmissionPdfW,
-         float             *oDirectPdfA,
-         float             *oCosThetaLight));
-
-rtCallableProgram(float3, GetRadianceBackground,
-		(const Light *const light,
-		 const float		   mInvSceneRadiusSqr,
-		 const float3       &aRayDirection,
-		 const float3       &aHitPoint,
-		 float             *oDirectPdfA,
-		 float             *oEmissionPdfW));
-
 rtCallableProgram(float3, IlluminateAreaLight,
 		(const Light *const light,
          const float3       &aReceivingPosition,
@@ -92,28 +65,6 @@ rtCallableProgram(float3, GetRadianceAreaLight,
 		 float             *oDirectPdfA,
 		 float             *oEmissionPdfW));
 
-rtCallableProgram(float3, IlluminateDirectional,
-		(const Light *const light,
-		 const float		   mInvSceneRadiusSqr,
-         float3             &oDirectionToLight,
-         float              &oDistance,
-         float              &oDirectPdfW,
-         float              *oEmissionPdfW,
-         float              *oCosAtLight));
-
-rtCallableProgram(float3, EmitDirectional,
-	    (const Light *const light,
-         const float3      mSceneCenter,
-		 const float       mSceneRadius,
-		 const float		  mInvSceneRadiusSqr,
-         const float2      &aPosRndTuple,
-         float3            &oPosition,
-         float3            &oDirection,
-         float             &oEmissionPdfW,
-         float             *oDirectPdfA,
-         float             *oCosThetaLight));
-
-rtCallableProgram(float3, GetRadianceDirectional, ());
 #else
 #include "AreaLight.h"
 #endif
@@ -443,6 +394,7 @@ __device__ __forceinline__ float3 JoinVertices(
     const float3           &aCameraHitpoint,
     const SubPathState     &aCameraState)
 {
+
 	//get the vertices to be joined
     float3 direction   = aLightVertex.isxPoint - aCameraHitpoint;
     const float dist2 = dot(direction, direction);
@@ -502,11 +454,11 @@ __device__ __forceinline__ float3 JoinVertices(
 	rtTrace(top_object, shadow_ray, prd_occlusion);
     if (prd_occlusion.occluded)
 		return make_float3(0.0f);
-
+	
     return contrib;
 }
 
-#define FAST_CONNECTION
+//#define FAST_CONNECTION
 #define CONNECT_VERTEXES
 
 RT_PROGRAM void pinhole_camera()
@@ -515,6 +467,7 @@ RT_PROGRAM void pinhole_camera()
 #ifdef CONNECT_VERTEXES
 	LightVertex lvertexes[10]; 
 #endif
+	clock_t start_time = clock();
 	SubPathState lightState, cameraState;
 
 	size_t2 screen = temp_buffer.size();
@@ -539,11 +492,12 @@ RT_PROGRAM void pinhole_camera()
 		SampleLight(lightState, mMisVcWeightFactor, seed);
 
 		int numLightVertex = 0;
-        for (;; ++lightState.pathlen)
-        {
+		for (;; ++lightState.pathlen)
+		{
 			const optix::Ray ray = optix::make_Ray(lightState.origin, lightState.direction, radiance_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 			PerRayData_closestHit prd;
 			//trace light rays and save radiance
+			atomicAdd(&raysTracedThisFrame[0], 1);
 			rtTrace(top_object, ray, prd);
 			if (prd.dist == -1.0f)
 				break;
@@ -554,45 +508,45 @@ RT_PROGRAM void pinhole_camera()
 				break;
 
 			const float3 hitPoint = ray.origin + ray.direction * prd.dist;
-            {
-               
-                if (lightState.pathlen > 1 || lightState.isLgtFinite == 1)
-                    lightState.allMIS *= Mis(prd.dist * prd.dist);
+			{
+
+				if (lightState.pathlen > 1 || lightState.isLgtFinite == 1)
+					lightState.allMIS *= Mis(prd.dist * prd.dist);
 
 				const float den = Mis(abs(bsdf.CosThetaFix()));
-                lightState.allMIS /= den;
-                lightState.bdptMIS  /= den;
-                lightState.elseMIS  /= den;
-            }
+				lightState.allMIS /= den;
+				lightState.bdptMIS /= den;
+				lightState.elseMIS /= den;
+			}
 
-            if (!bsdf.isDelta)
-            {
+			if (!bsdf.isDelta)
+			{
 #ifdef CONNECT_VERTEXES
 				lvertexes[numLightVertex].isxPoint   = hitPoint;
-                lvertexes[numLightVertex].throughput = lightState.throughput;
-                lvertexes[numLightVertex].pathlen = lightState.pathlen;
-                lvertexes[numLightVertex].bsdf       = bsdf;
+				lvertexes[numLightVertex].throughput = lightState.throughput;
+				lvertexes[numLightVertex].pathlen = lightState.pathlen;
+				lvertexes[numLightVertex].bsdf       = bsdf;
 
-                lvertexes[numLightVertex].allMIS = lightState.allMIS;
-                lvertexes[numLightVertex].bdptMIS  = lightState.bdptMIS;
-                lvertexes[numLightVertex++].elseMIS  = lightState.elseMIS;
+				lvertexes[numLightVertex].allMIS = lightState.allMIS;
+				lvertexes[numLightVertex].bdptMIS  = lightState.bdptMIS;
+				lvertexes[numLightVertex++].elseMIS  = lightState.elseMIS;
 #endif
 
-                JoinWithCamera(lightState, hitPoint, bsdf, mLightSubPathCount, mMisVcWeightFactor);
-            }
-            if (lightState.pathlen + 2 > mMaxPathLength)
-                break;
-            if (!SampleScattering(bsdf, hitPoint, lightState, mMisVcWeightFactor, seed))
-                break;
-        }
+				JoinWithCamera(lightState, hitPoint, bsdf, mLightSubPathCount, mMisVcWeightFactor);
+			}
+			if (lightState.pathlen + 2 > mMaxPathLength)
+				break;
+			if (!SampleScattering(bsdf, hitPoint, lightState, mMisVcWeightFactor, seed))
+				break;
+		}
 
-	
-        GenerateCameraSample(launch_index, mLightSubPathCount, cameraState, seed);
-        float3 color = make_float3(0);
 
-       //trace eye/camera rays and save radiance to add with light subpaths
-        for (;; ++cameraState.pathlen)
-        {
+		GenerateCameraSample(launch_index, mLightSubPathCount, cameraState, seed);
+		float3 color = make_float3(0);
+
+		//trace eye/camera rays and save radiance to add with light subpaths
+		for (;; ++cameraState.pathlen)
+		{
 			const optix::Ray ray = optix::make_Ray(cameraState.origin, cameraState.direction, radiance_ray_type, scene_epsilon, RT_DEFAULT_MAX);
 			PerRayData_closestHit prd;
 			rtTrace(top_object, ray, prd);
@@ -602,85 +556,99 @@ RT_PROGRAM void pinhole_camera()
 				break;
 			}
 
-            CameraBSDF bsdf;
+			CameraBSDF bsdf;
 			bsdf.Setup(ray, prd);
 			if (!bsdf.IsValid())
 				break;
 
 			const float3 hitPoint = ray.origin + ray.direction * prd.dist;
-            {
-                cameraState.allMIS *= Mis(prd.dist * prd.dist);
+			{
+				cameraState.allMIS *= Mis(prd.dist * prd.dist);
 				const float den = Mis(abs(bsdf.CosThetaFix()));
-                cameraState.allMIS /= den;
-                cameraState.bdptMIS  /= den;
-                cameraState.elseMIS  /= den;
-            }
-		
+				cameraState.allMIS /= den;
+				cameraState.bdptMIS /= den;
+				cameraState.elseMIS /= den;
+			}
+
 #ifdef USE_CALLABLE_PROGRAM
 			Light light;
-			light.SetupAreaLight(prd.p[0], prd.p[1], prd.p[2], prd.mat.mDiffuseReflectance);
+			light.SetupAreaLight(prd.p[0], prd.p[1], prd.p[2], prd.mat.diffusePart);
 			const float3 lrd = getRadiance(0, &light, cameraState, hitPoint, ray.direction);
 
 			if (prd.mat.isEmitter)
 			{
-                color += cameraState.throughput * lrd;
-                break;
-            }
+				color += cameraState.throughput * lrd;
+				break;
+			}
 #else
-            if (prd.mat.isEmitter)
+			if (prd.mat.isEmitter)
 			{
 				Light light;
 				//calculate light radiance if hit with camera direct; maybe remove the setup part from here
 				light.SetupAreaLight(prd.p[0], prd.p[1], prd.p[2], prd.mat.diffusePart);
 				const float3 lrd = getRadiance(0, &light, cameraState, hitPoint, ray.direction);
-                color += cameraState.throughput * lrd;
-			
-                break;
-            }
+				color += cameraState.throughput * lrd;
+
+				break;
+			}
 #endif
-            if (cameraState.pathlen >= mMaxPathLength)
-                break;
-            if (!bsdf.isDelta)
-            {
-                color += cameraState.throughput *
-                    DirectLighting(cameraState, hitPoint, bsdf, seed);
-				
+			if (cameraState.pathlen >= mMaxPathLength)
+				break;
+			if (!bsdf.isDelta)
+			{
+				color += cameraState.throughput *
+					DirectLighting(cameraState, hitPoint, bsdf, seed);
+
 
 #ifdef CONNECT_VERTEXES
 
 
 #ifndef FAST_CONNECTION
-                for (int i = 0; i < numLightVertex; ++i)
+				for (int i = 0; i < numLightVertex; ++i)
 #endif
-                {
+				{
 #ifdef FAST_CONNECTION
 					const int i = (int)(rnd(seed) * numLightVertex);
 #endif
-                    const LightVertex &lightVertex = lvertexes[i];
+					const LightVertex &lightVertex = lvertexes[i];
 
-                   if (lightVertex.pathlen + 1 +
-                        cameraState.pathlen > mMaxPathLength)
-                        break;
+					if (lightVertex.pathlen + 1 +
+						cameraState.pathlen > mMaxPathLength)
+						break;
 
-                    color += cameraState.throughput * lightVertex.throughput *
-                        JoinVertices(lightVertex, bsdf, hitPoint, cameraState);
+					color += cameraState.throughput * lightVertex.throughput *
+						JoinVertices(lightVertex, bsdf, hitPoint, cameraState);
 					//rtPrintf("camera thruput: %f\n", cameraState.throughput);
 					//rtPrintf("light thruput: %f\n", lightVertex.throughput);
-                }
+				}
 #endif
-            }
+			}
 
-            if (!SampleScattering(bsdf, hitPoint, cameraState, mMisVcWeightFactor, seed))
-                break;
-        }
+			if (!SampleScattering(bsdf, hitPoint, cameraState, mMisVcWeightFactor, seed))
+				break;
+		}
 		//rtPrintf("color: %f, %f, %f\n", color.x, color.y, color.z);
 		//color = make_float3(10.4f, 0.f, 0.f);
 		float *const base_output = (float *)&temp_buffer[make_uint2(0, 0)];
 		const uint offset = (launch_index.x + launch_index.y * temp_buffer.size().x) << 2;
-		atomicAdd(base_output + offset,     color.x);
+		atomicAdd(base_output + offset, color.x);
 		atomicAdd(base_output + offset + 1, color.y);
 		atomicAdd(base_output + offset + 2, color.z);
 	}
+	/*clock_t stop_time = clock();
+	float *const base_output = (float *)&temp_buffer[make_uint2(0, 0)];
+	const uint offset = (launch_index.x + launch_index.y * temp_buffer.size().x) << 2;
+
+	int *const temp = (int*)&temp_buffer[make_uint2(0, 0)];
+
+	int time = (int)(stop_time - start_time);
+	atomicMin(temp + offset, 0);
+	atomicMin(temp + offset + 1, 0);
+	atomicMin(temp + offset + 2, 0);
+	atomicAdd(base_output + offset,		time / 10380000.f);
+	atomicAdd(base_output + offset + 1, time / 10380000.f);
+	atomicAdd(base_output + offset + 2, time / 10380000.f);*/
+	//rtPrintf("time in pinhole_camera %fms\n", time / 1038000.f);
 }
 
 RT_PROGRAM void exception()

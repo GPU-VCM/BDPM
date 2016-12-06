@@ -193,15 +193,15 @@ void translateMeshToOptiX(
 
     optix::Program closest_hit = optix_mesh.closest_hit;
     optix::Program any_hit     = optix_mesh.any_hit;
-    //createMaterialPrograms( ctx, have_textures, closest_hit, any_hit );
+    createMaterialPrograms( ctx, have_textures, closest_hit, any_hit );
 
-    /*for( int32_t i = 0; i < mesh.num_materials; ++i )
+    for( int32_t i = 0; i < mesh.num_materials; ++i )
       optix_materials.push_back( createOptiXMaterial(
             ctx,
             closest_hit,
             any_hit,
             mesh.mat_params[i],
-            have_textures ) );*/
+            have_textures ) );
   }
 
   optix::Geometry geometry = ctx->createGeometry();  

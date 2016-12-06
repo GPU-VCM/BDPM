@@ -60,6 +60,8 @@
 #include <cstring>
 #include <iostream>
 #include <stdint.h>
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 using namespace optix;
 
@@ -79,8 +81,6 @@ bool           use_pbo = true;
 int            frame_number = 1;
 int            sqrt_num_samples = 2;
 int            rr_begin_depth = 1;
-Program        pgram_intersection = 0;
-Program        pgram_bounding_box = 0;
 Program        tri_intersection = 0;
 Program        tri_bounding_box = 0;
 
@@ -98,6 +98,7 @@ int            mouse_button;
 
 int lightConditions, mMaxPathLength;
 int materials, object;
+float amount;
 
 
 //------------------------------------------------------------------------------
@@ -177,36 +178,6 @@ void setMaterial(
 	gi[color_name]->setFloat(color);
 }
 
-
-GeometryInstance createParallelogram(
-	const float3& anchor,
-	const float3& offset1,
-	const float3& offset2)
-{
-	Geometry parallelogram = context->createGeometry();
-	parallelogram->setPrimitiveCount(1u);
-	parallelogram->setIntersectionProgram(pgram_intersection);
-	parallelogram->setBoundingBoxProgram(pgram_bounding_box);
-
-	float3 normal = normalize(cross(offset1, offset2));
-	float d = dot(normal, anchor);
-	float4 plane = make_float4(normal, d);
-
-	float3 v1 = offset1 / dot(offset1, offset1);
-	float3 v2 = offset2 / dot(offset2, offset2);
-
-	parallelogram["plane"]->setFloat(plane);
-	parallelogram["anchor"]->setFloat(anchor);
-	parallelogram["v1"]->setFloat(v1);
-	parallelogram["v2"]->setFloat(v2);
-	parallelogram["invArea"]->setFloat(1.f / length(cross(v1, v2)));
-
-	GeometryInstance gi = context->createGeometryInstance();
-	gi->setGeometry(parallelogram);
-	return gi;
-}
-
-
 void createContext()
 {
 	context = Context::create();
@@ -217,6 +188,7 @@ void createContext()
 	lightConditions = 2;
 	materials = object = 0;
 	mMaxPathLength = 5;
+	amount = 20.f;
 	context["mMaxPathLength"]->setInt(10);
 	context->setRayTypeCount(2);
 	context->setEntryPointCount(3);
@@ -236,6 +208,16 @@ void createContext()
 	Buffer temp_buffer = sutil::createOutputBuffer(context, RT_FORMAT_FLOAT4, width, height, false);
 	context["temp_buffer"]->setBuffer(temp_buffer);
 
+	Buffer b = context->createBuffer(RT_BUFFER_INPUT_OUTPUT);
+	b->setFormat(RT_FORMAT_INT);
+	int vals[] = { 0 };
+	b->setSize(sizeof(vals));
+	memcpy(b->map(), vals, sizeof(vals));
+	b->unmap();
+	int* buffers = static_cast<int*>(b->map());
+	b->unmap();
+	context["raysTracedThisFrame"]->setBuffer(b);
+
 	//ray gen programs
 	std::string ptx = ptxPath(std::string("pinhole_camera.cu"));
 	context->setRayGenerationProgram(0, context->createProgramFromPTXFile(ptx, "pinhole_camera"));
@@ -249,8 +231,6 @@ void createContext()
 
 
 	// Setup programs
-	/*const std::string cuda_file = std::string(SAMPLE_NAME) + ".cu";
-	const std::string ptx_path = ptxPath(cuda_file);*/
 	
 	context["sqrt_num_samples"]->setUint(sqrt_num_samples);
 	context["bad_color"]->setFloat(1000000.0f, 0.0f, 1000000.0f); // Super magenta to make sure it doesn't get averaged out in the progressive rendering.
@@ -258,7 +238,7 @@ void createContext()
 
 	// Build the stratified grid...
 
-	const int grid = 8;
+	const int grid = 16;
 	const int grid2 = grid * grid;
 	Buffer strat_buffer = context->createBuffer(RT_BUFFER_INPUT);
 	strat_buffer->setFormat(RT_FORMAT_FLOAT2);
@@ -273,7 +253,7 @@ void createContext()
 		}
 
 	strat_buffer->unmap();
-	context["strat_buffer"]->set(strat_buffer);
+	context["strat_buffer"]->setBuffer(strat_buffer);
 
 	context["aRadiusFactor"]->setFloat(0.003f);
 	context["aRadiusAlpha"]->setFloat(0.75f);
@@ -292,9 +272,6 @@ void createLightBuffer(Mesh model, std::vector<Light> &nlights, const float3 &em
 			vert[model.tri_indices[i * 3 + 2]],
 			emissive
 			);
-		/*printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 0]].x, vert[model.tri_indices[i * 3 + 0]].y,vert[model.tri_indices[i * 3 + 0]].z);
-		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 1]].x, vert[model.tri_indices[i * 3 + 1]].y,vert[model.tri_indices[i * 3 + 1]].z);
-		printf("positions: %f, %f, %f\n", vert[model.tri_indices[i * 3 + 2]].x, vert[model.tri_indices[i * 3 + 2]].y,vert[model.tri_indices[i * 3 + 2]].z);*/
 		nlights.push_back(vlight);
 	}
 }
@@ -302,32 +279,21 @@ void createLightBuffer(Mesh model, std::vector<Light> &nlights, const float3 &em
 
 void loadGeometry(const std::string mesh_file)
 {
+	
 
 	context->setPrintEnabled(1);
 	context->setPrintBufferSize(4096);
-	//context->setPrintLaunchIndex(0, 0, 0);
 
-	// Light buffer
-	/*ParallelogramLight light;
-	light.corner = make_float3(343.0f, 548.6f, 227.0f);
-	light.v1 = make_float3(-130.0f, 0.0f, 0.0f);
-	light.v2 = make_float3(0.0f, 0.0f, 105.0f);
-	light.normal = normalize(cross(light.v1, light.v2));
-	light.emission = make_float3(15.0f, 15.0f, 15.0f);
-*/
 	std::vector<Light> nlights;
-	Mesh model;// = glmReadOBJ("./CornellLight.obj");
+	Mesh model;
 	std::string light_name = std::string(sutil::samplesDir()) + "/data/CornellLight.obj";
-	Matrix4x4 matrix = Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 15.f, 5.f));
+	Matrix4x4 matrix = Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 0.f, 0.f));
 	const float* xform = matrix.getData();
 	
 	loadMesh(light_name, model, xform);
-	/*float3* positions = reinterpret_cast<float3*>(model.positions);
-	for (int32_t i = 0; i < model.num_triangles; ++i)
-		printf("positions: %f, %f, %f\n", positions[i].x,  positions[i].y,  positions[i].z);*/
 
 	if (lightConditions > 1)
-		createLightBuffer(model, nlights, make_float3(250.03329895614464f, 250.03329895614464f, 250.03329895614464f));
+		createLightBuffer(model, nlights, make_float3(25.03329895614464f, 25.03329895614464f, 25.03329895614464f));
 
 	// Create a buffer for the next-event estimation...
 
@@ -403,21 +369,7 @@ void loadGeometry(const std::string mesh_file)
 	mat.mirror = make_float3(1, 1, 1);
 	material[6]["mat"]->setUserData(sizeof(BaseMaterial), &mat);
 
-	// Set up material
-	const std::string cuda_file = std::string("diffuse") + ".cu";
-	std::string ptx_path = ptxPath(cuda_file);
-	Material diffuse = context->createMaterial();
-	Program diffuse_ch = context->createProgramFromPTXFile(ptx_path, "closest_hit_diffuse");
-	Program diffuse_ah = context->createProgramFromPTXFile(ptx_path, "any_hit_occlusion");
-	diffuse->setClosestHitProgram(0, diffuse_ch);
-	diffuse->setAnyHitProgram(1, diffuse_ah);
-
-	// Set up parallelogram programs
-	ptx_path = ptxPath("parallelogram.cu");
-	pgram_bounding_box = context->createProgramFromPTXFile(ptx_path, "bounds");
-	pgram_intersection = context->createProgramFromPTXFile(ptx_path, "intersect");
-
-	ptx_path = ptxPath("triangle_mesh_iterative.cu");
+	const std::string ptx_path = ptxPath("triangle_mesh_iterative.cu");
 	tri_bounding_box = context->createProgramFromPTXFile(ptx_path, "mesh_bounds");
 	tri_intersection = context->createProgramFromPTXFile(ptx_path, "mesh_intersect");
 
@@ -429,127 +381,37 @@ void loadGeometry(const std::string mesh_file)
 	const float3 red = make_float3(0.8f, 0.05f, 0.05f);
 	const float3 light_em = make_float3(15.0f, 15.0f, 15.0f);
 
-
-
-	//// Floor
-	//gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
-	//	make_float3(0.0f, 0.0f, 559.2f),
-	//	make_float3(556.0f, 0.0f, 0.0f)));
-	////gis.back()->addMaterial(material[0]);
-	////setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.back()->setMaterialCount(1);
-	//gis.back()->setMaterial(0, material[0]);
-
-	//// Ceiling
-	//gis.push_back(createParallelogram(make_float3(0.0f, 548.8f, 0.0f),
-	//	make_float3(556.0f, 0.0f, 0.0f),
-	//	make_float3(0.0f, 0.0f, 559.2f)));
-	//gis.back()->addMaterial(material[0]);
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-	//// Back wall
-	//gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 559.2f),
-	//	make_float3(0.0f, 548.8f, 0.0f),
-	//	make_float3(556.0f, 0.0f, 0.0f)));
-	////setMaterial(gis.back(), specular, "specular_color", white);
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-	//// Right wall
-	//gis.push_back(createParallelogram(make_float3(0.0f, 0.0f, 0.0f),
-	//	make_float3(0.0f, 548.8f, 0.0f),
-	//	make_float3(0.0f, 0.0f, 559.2f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", green);
-
-	//// Left wall
-	//gis.push_back(createParallelogram(make_float3(556.0f, 0.0f, 0.0f),
-	//	make_float3(0.0f, 0.0f, 559.2f),
-	//	make_float3(0.0f, 548.8f, 0.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", red);
-
-	//// Short block
-	//gis.push_back(createParallelogram(make_float3(130.0f, 165.0f, 65.0f),
-	//	make_float3(-48.0f, 0.0f, 160.0f),
-	//	make_float3(160.0f, 0.0f, 49.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back(createParallelogram(make_float3(290.0f, 0.0f, 114.0f),
-	//	make_float3(0.0f, 165.0f, 0.0f),
-	//	make_float3(-50.0f, 0.0f, 158.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back(createParallelogram(make_float3(130.0f, 0.0f, 65.0f),
-	//	make_float3(0.0f, 165.0f, 0.0f),
-	//	make_float3(160.0f, 0.0f, 49.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back(createParallelogram(make_float3(82.0f, 0.0f, 225.0f),
-	//	make_float3(0.0f, 165.0f, 0.0f),
-	//	make_float3(48.0f, 0.0f, -160.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back(createParallelogram(make_float3(240.0f, 0.0f, 272.0f),
-	//	make_float3(0.0f, 165.0f, 0.0f),
-	//	make_float3(-158.0f, 0.0f, -47.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
-	//// Tall block
-	//gis.push_back(createParallelogram(make_float3(423.0f, 330.0f, 247.0f),
-	//	make_float3(-158.0f, 0.0f, 49.0f),
-	//	make_float3(49.0f, 0.0f, 159.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back(createParallelogram(make_float3(423.0f, 0.0f, 247.0f),
-	//	make_float3(0.0f, 330.0f, 0.0f),
-	//	make_float3(49.0f, 0.0f, 159.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back(createParallelogram(make_float3(472.0f, 0.0f, 406.0f),
-	//	make_float3(0.0f, 330.0f, 0.0f),
-	//	make_float3(-158.0f, 0.0f, 50.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back(createParallelogram(make_float3(314.0f, 0.0f, 456.0f),
-	//	make_float3(0.0f, 330.0f, 0.0f),
-	//	make_float3(-49.0f, 0.0f, -160.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-	//gis.push_back(createParallelogram(make_float3(265.0f, 0.0f, 296.0f),
-	//	make_float3(0.0f, 330.0f, 0.0f),
-	//	make_float3(158.0f, 0.0f, -49.0f)));
-	//setMaterial(gis.back(), diffuse, "diffuse_color", white);
-
 	//load mesh
 	OptiXMesh mesh;
 	mesh.context = context;
 	mesh.intersection = tri_intersection;
 	mesh.bounds = tri_bounding_box;
+	mesh.material = material[1];
+	loadMesh(mesh_file, mesh, Matrix4x4::scale(make_float3(2500.f)) * Matrix4x4::translate(make_float3(0.12f, 0.f, -0.05f)));
+	gis.push_back(mesh.geom_instance);
+
 	mesh.material = material[4];
-	loadMesh(mesh_file, mesh, Matrix4x4::scale(make_float3(3000.f)) * Matrix4x4::translate(make_float3(0.1f, 0.f, -0.3f)));
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellKnot.obj", mesh, Matrix4x4::scale(make_float3(80.f)) * Matrix4x4::translate(make_float3(0.1f, 3.f, 0.f)));
+	gis.push_back(mesh.geom_instance);
+
+	loadMesh(std::string(sutil::samplesDir()) + "/data/dragon.obj", mesh, Matrix4x4::scale(make_float3(300.f)) * Matrix4x4::translate(make_float3(0.5f, 0.4f, -1.2f)) * Matrix4x4::rotate(-1.5709f, make_float3(0.f, 1.f, 0.f)));
 	gis.push_back(mesh.geom_instance);
 
 	mesh.material = material[0];
-	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellDiffuse2.obj", mesh, Matrix4x4::rotate(3.1412f, make_float3(0.f, 1.f, 0.f)) * Matrix4x4::scale(make_float3(500.f)) * Matrix4x4::translate(make_float3(-3.4f, 0.f, 5.f)));
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellDiffuse2.obj", mesh, Matrix4x4::rotate(3.1412f, make_float3(0.f, 1.f, 0.f)) * Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-5.4f, 0.f, 5.f)));
 	gis.push_back(mesh.geom_instance);
 
-	mesh.material = material[0];
-	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", mesh, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 13.f, 5.f))/* *Matrix4x4::rotate(1.57f, make_float3(0.f, 1.f, 0.f))*/);
+	/*mesh.material = material[0];
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", mesh, Matrix4x4::scale(make_float3(110.f)) * Matrix4x4::translate(make_float3(-0.35f, -0.7f, 0.1f)));
+	gis.push_back(mesh.geom_instance);*/
+
+	mesh.material = material[1];
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellRedWall.obj", mesh, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 0.f, 0.55f)));
 	gis.push_back(mesh.geom_instance);
 
-	//gis.back()->addMaterial(material[0]);
-	//gis.back()->addMaterial(material[0]);
-
-	/*OptiXMesh floor;
-	floor.intersection = tri_intersection;
-	floor.bounds = tri_bounding_box;
-	floor.context = context;
-	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellDiffuse.obj", floor, Matrix4x4::identity());
-	gis.push_back(floor.geom_instance);
-	gis.back()->addMaterial(material[0]);
-
-	floor.intersection = tri_intersection;
-	floor.bounds = tri_bounding_box;
-	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellRedWall.obj", floor, Matrix4x4::identity());
-	gis.push_back(floor.geom_instance);
-	gis.back()->addMaterial(material[0]);
-
-	floor.intersection = tri_intersection;
-	floor.bounds = tri_bounding_box;
-	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellBlueWall.obj", floor, Matrix4x4::identity());
-	gis.push_back(floor.geom_instance);
-	gis.back()->addMaterial(material[0]);*/
-
+	mesh.material = material[2];
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellBlueWall.obj", mesh, Matrix4x4::rotate(3.1412f, make_float3(0.f, 1.f, 0.f)) * Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-5.4f, 0.f, 5.f)));
+	gis.push_back(mesh.geom_instance);
 
 	// Create shadow group (no light)
 	GeometryGroup shadow_group = context->createGeometryGroup(gis.begin(), gis.end());
@@ -562,9 +424,8 @@ void loadGeometry(const std::string mesh_file)
 	floor.intersection = tri_intersection;
 	floor.bounds = tri_bounding_box;
 	floor.material = material[3];
-	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", floor, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 15.f, 5.f))/* *Matrix4x4::rotate(1.57f, make_float3(0.f, 1.f, 0.f))*/);
+	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", floor, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 0.f, 0.f)));
 	gis.push_back(floor.geom_instance);
-	//gis.back()->addMaterial(material[3]);
 
 	// Create geometry group
 
@@ -581,7 +442,7 @@ void loadGeometry(const std::string mesh_file)
 void setupCamera()
 {
 	camera_eye = make_float3(278.0f, 273.0f, -900.0f);
-	camera_lookat = make_float3(278.0f, 273.0f, 0.0f);
+	camera_lookat = make_float3(268.0f, 273.0f, 0.0f);
 	camera_up = make_float3(0.0f, 1.0f, 0.0f);
 
 	camera_rotate = Matrix4x4::identity();
@@ -686,10 +547,19 @@ void glutRun()
 void glutDisplay()
 {
 	updateCamera();
+
+	Buffer b = context->getBufferFromId(3);
+	int vals[] = { 0 }; //re-initialize a zero value
+	memcpy(b->map(), vals, sizeof(vals)); // copy the zero value to buffer
+	b->unmap();
+
 	context->launch(1, width, height);
 	context->launch(0, width, height);
 	context->launch(2, width, height);
 
+	int* buffers = static_cast<int*>(b->map()); // grab the resulting buffer.
+	//std::cout << "Rays This Frame: " << buffers[0] << std::endl; // Output the rays in this frame
+	b->unmap();
 
 	sutil::displayBufferGL(getOutputBuffer());
 
@@ -707,19 +577,43 @@ void glutKeyboardPress(unsigned char k, int x, int y)
 
 	switch (k)
 	{
-	case('q') :
-	case(27) : // ESC
-	{
-		destroyContext();
-		exit(0);
-	}
-	case('s') :
-	{
-		const std::string outputImage = std::string(SAMPLE_NAME) + ".ppm";
-		std::cerr << "Saving current frame to '" << outputImage << "'\n";
-		sutil::displayBufferPPM(outputImage.c_str(), getOutputBuffer());
-		break;
-	}
+		case('q') :
+		case(27) : // ESC
+		{
+			destroyContext();
+			exit(0);
+		}
+		case('g') :
+		{
+			const std::string outputImage = std::string(SAMPLE_NAME) + ".ppm";
+			std::cerr << "Saving current frame to '" << outputImage << "'\n";
+			sutil::displayBufferPPM(outputImage.c_str(), getOutputBuffer());
+			break;
+		}
+		case('s') :
+		{
+			camera_eye = camera_eye - make_float3(0.f, 0.f, amount);
+			camera_changed = true;
+			break;
+		}
+		case('d') :
+		{
+			camera_eye = camera_eye - make_float3(amount, 0.f, 0.f);
+			camera_changed = true;
+			break;
+		}
+		case('a') :
+		{
+			camera_eye = camera_eye - make_float3(-amount, 0.f, 0.f);
+			camera_changed = true;
+			break;
+		}
+		case('w') :
+		{
+			camera_eye = camera_eye - make_float3(0.f, 0.f, -amount);
+			camera_changed = true;
+			break;
+		}
 	}
 }
 
