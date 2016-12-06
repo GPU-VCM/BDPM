@@ -558,7 +558,7 @@ void glutDisplay()
 	context->launch(2, width, height);
 
 	int* buffers = static_cast<int*>(b->map()); // grab the resulting buffer.
-	//std::cout << "Rays This Frame: " << buffers[0] << std::endl; // Output the rays in this frame
+	std::cout << "Rays This Frame: " << buffers[0] << " frame: " << frame_number << std::endl; // Output the rays in this frame
 	b->unmap();
 
 	sutil::displayBufferGL(getOutputBuffer());

@@ -3,6 +3,12 @@
 Screenshots
 -----------
 
+This test scene has a total of 880,002 tris and 439,909 verts
+
+- Knot: 2,880 tris
+- Cow: 5,804 tris
+- Dragon: 871,306 tris
+
 ![](VCM/img/bdpt_test_scene.PNG)
 
 ![](VCM/img/cornell_knot_bdpt.PNG)
@@ -27,6 +33,8 @@ Analysis
 --------
 All of the analysis has been done on the following test scene:
 ![](VCM/img/bdpt_test_scene.PNG)
+
+This test scene has a total of 880,002 tris and 439,909 verts
 
 Analysis with Nsight offers:
 
@@ -66,6 +74,10 @@ With this image, we can clearly tell where most of the time is being spent. The 
 ![](VCM/img/connectiontype_bdpt.png)
 
 ![](VCM/img/connection_tpye2.png)
+
+Another useful analysis is the number of rays being traced in the scene with 2 refractive objects and 3 diffuse objects:
+
+![](VCM/img/rays_per_frame.png)
 
 ###### Average time spent in `pinhole_camera`
 | No fast connection | Fast connection |
