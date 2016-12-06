@@ -333,6 +333,7 @@ __device__ __forceinline__ float3 DirectLighting(
     const CameraBSDF       &aBsdf,
 	uint				   &seed)
 {
+	clock_t start_time = clock();
     const int   lightCount    = lightBuffer.size();
     const float lightPickProb = 1.0f / lightCount;
 
@@ -383,7 +384,9 @@ __device__ __forceinline__ float3 DirectLighting(
 	rtTrace(top_object, shadow_ray, prd_occlusion);
     if (prd_occlusion.occluded)
 		return make_float3(0.0f);
-
+	clock_t stop_time = clock();
+	int time = (int)(stop_time - start_time);
+	//rtPrintf("time in JoinVertices %fms\n", time / 1038000.f);
 	//rtPrintf("contrib: %f, %f, %f\n", contrib.x, contrib.y, contrib.z);
     return contrib;
 }
@@ -394,7 +397,7 @@ __device__ __forceinline__ float3 JoinVertices(
     const float3           &aCameraHitpoint,
     const SubPathState     &aCameraState)
 {
-
+	clock_t start_time = clock();
 	//get the vertices to be joined
     float3 direction   = aLightVertex.isxPoint - aCameraHitpoint;
     const float dist2 = dot(direction, direction);
@@ -454,11 +457,13 @@ __device__ __forceinline__ float3 JoinVertices(
 	rtTrace(top_object, shadow_ray, prd_occlusion);
     if (prd_occlusion.occluded)
 		return make_float3(0.0f);
-	
+	clock_t stop_time = clock();
+	int time = (int)(stop_time - start_time);
+	//rtPrintf("time in JoinVertices %fms\n", time / 1038000.f);
     return contrib;
 }
 
-//#define FAST_CONNECTION
+#define FAST_CONNECTION
 #define CONNECT_VERTEXES
 
 RT_PROGRAM void pinhole_camera()
@@ -475,7 +480,6 @@ RT_PROGRAM void pinhole_camera()
 
 	const float mLightSubPathCount = (float)(launch_dim.x * launch_dim.y);
 	const float mBaseRadius = aRadiusFactor * (9.5f / 2.0f) * sqrtf(2.0f);
-	
     float radius = mBaseRadius / powf(float(frame_number), 0.5f * (1 - aRadiusAlpha));
     
 	// Apparently for numeric stability
@@ -635,14 +639,14 @@ RT_PROGRAM void pinhole_camera()
 		atomicAdd(base_output + offset + 1, color.y);
 		atomicAdd(base_output + offset + 2, color.z);
 	}
-	/*clock_t stop_time = clock();
+	clock_t stop_time = clock();
 	float *const base_output = (float *)&temp_buffer[make_uint2(0, 0)];
 	const uint offset = (launch_index.x + launch_index.y * temp_buffer.size().x) << 2;
 
 	int *const temp = (int*)&temp_buffer[make_uint2(0, 0)];
 
 	int time = (int)(stop_time - start_time);
-	atomicMin(temp + offset, 0);
+	/*atomicMin(temp + offset, 0);
 	atomicMin(temp + offset + 1, 0);
 	atomicMin(temp + offset + 2, 0);
 	atomicAdd(base_output + offset,		time / 10380000.f);
