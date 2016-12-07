@@ -401,9 +401,9 @@ void loadGeometry(const std::string mesh_file)
 	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellDiffuse2.obj", mesh, Matrix4x4::rotate(3.1412f, make_float3(0.f, 1.f, 0.f)) * Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-5.4f, 0.f, 5.f)));
 	gis.push_back(mesh.geom_instance);
 
-	/*mesh.material = material[0];
+	mesh.material = material[0];
 	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellLight.obj", mesh, Matrix4x4::scale(make_float3(110.f)) * Matrix4x4::translate(make_float3(-0.35f, -0.7f, 0.1f)));
-	gis.push_back(mesh.geom_instance);*/
+	//gis.push_back(mesh.geom_instance);
 
 	mesh.material = material[1];
 	loadMesh(std::string(sutil::samplesDir()) + "/data/CornellRedWall.obj", mesh, Matrix4x4::scale(make_float3(100.f)) * Matrix4x4::translate(make_float3(-0.1f, 0.f, 0.55f)));
@@ -558,7 +558,7 @@ void glutDisplay()
 	context->launch(2, width, height);
 
 	int* buffers = static_cast<int*>(b->map()); // grab the resulting buffer.
-	std::cout << "Rays This Frame: " << buffers[0] << " frame: " << frame_number << std::endl; // Output the rays in this frame
+	//std::cout << "Rays This Frame: " << buffers[0] << " frame: " << frame_number << std::endl; // Output the rays in this frame
 	b->unmap();
 
 	sutil::displayBufferGL(getOutputBuffer());
