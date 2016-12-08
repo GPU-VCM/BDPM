@@ -92,6 +92,7 @@ rtBuffer<ParallelogramLight>     lights;
 
 RT_PROGRAM void pathtrace_camera()
 {
+	//rtPrintf("in second pass start\n");
     size_t2 screen = output_buffer.size();
 
     float2 inv_screen = 1.0f/make_float2(screen) * 2.f;
@@ -126,9 +127,10 @@ RT_PROGRAM void pathtrace_camera()
 			if (prd.depth > 8)
 				break;
 			//ray_direction = normalize(ray_direction);
+			//rtPrintf("in second pass mid\n");
             Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
             rtTrace(top_object, ray, prd);
-
+			
             if(prd.done)
             {
                 // We have hit the background or a luminaire
@@ -162,7 +164,7 @@ RT_PROGRAM void pathtrace_camera()
     //
     float3 pixel_color = result;
 	
-
+	
     if (frame_number > 0)
     {
         float a = 1.0f / (float)frame_number;
@@ -174,6 +176,7 @@ RT_PROGRAM void pathtrace_camera()
         output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
     }
 	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
+	//rtPrintf("in second pass\n");
 }
 
 
@@ -236,7 +239,7 @@ RT_PROGRAM void diffuse()
 
 	float3 averageColor = make_float3(0.0f);
 	int counter = 0;
-
+	//rtPrintf("color of photonBuffer: %f, %f, %f\n", photonBuffer[0].color.x, photonBuffer[0].color.y, photonBuffer[0].color.z);
 	for (int i = xx + flagx; i <= xx + flagx + 1; i++)
 		for (int j = yy + flagy; j <= yy + flagy + 1; j++)
 			for (int k = zz + flagz; k <= zz + flagz + 1; k++)

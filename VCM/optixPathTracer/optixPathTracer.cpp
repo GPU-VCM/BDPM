@@ -120,7 +120,7 @@ std::vector<float3> photonColor;
 int validPhoton;
 
 // grid information used for second-pass of photon mapping
-#define MAX_GRID 30000000
+#define MAX_GRID 3000000
 int gridStartIndex[MAX_GRID];
 int gridEndIndex[MAX_GRID];
 const float gridLength = 30.f;
@@ -335,6 +335,8 @@ void createContext(std::string filename)
 
 void loadGeometry(Context& crtContext, std::string cudaFileName)
 {
+	crtContext->setPrintEnabled(1);
+	crtContext->setPrintBufferSize(4096);
     // Light buffer
     ParallelogramLight light;
     light.corner   = make_float3( 343.0f, 548.6f, 227.0f);
@@ -434,7 +436,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
     setMaterial(gis.back(), diffuse, "diffuse_color", red);
 
 
-#define SPHERE
+#define COW
 
 #ifdef SPHERE
 	gis.push_back( createSphere( make_float3(150.0f, 350.0f, 350.0f), 100.0f,
@@ -454,9 +456,9 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
 	mesh.context = crtContext;
-	mesh.material = diffuse;
+	mesh.material = specular;
 
-	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(50.f)));
+	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(3000.f)));
 	gis.push_back(mesh.geom_instance);
 	gis.back()["diffuse_color"]->setFloat(red);
 	//setMaterial(gis.back(), diffuse, "diffuse_color", red);
