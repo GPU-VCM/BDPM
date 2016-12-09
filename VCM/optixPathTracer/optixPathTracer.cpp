@@ -435,7 +435,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
     setMaterial(gis.back(), diffuse, "diffuse_color", red);
 
 
-#define DRAGON
+#define COW
 
 #ifdef SPHERE
 	gis.push_back( createSphere( make_float3(150.0f, 350.0f, 350.0f), 100.0f,

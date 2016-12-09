@@ -9,7 +9,7 @@ Here's a [good introduction](https://web.cs.wpi.edu/~emmanuel/courses/cs563/writ
 Screenshots
 -----------
 
-#### Results
+#### Results (11 million photons)
 
 <table class="image">
 <tr>
@@ -53,9 +53,13 @@ Time cost in the pre-pass:
 
 ![](VCM/img/chart0.png)
 
-Time cost in the second-pass:(scene with only diffuse/specular material, which means)
+Time cost in the second-pass: (cornell box scene with diffuse walls and a specular shpere in the middle, which means most of rays bounce only once except for the rays hitting specular material)
 
 ![](VCM/img/chart1.png)
+
+Time cost in the second-pass: (cornell box scene with diffuse walls and a glass cow in the middle, which means rays hitting the cow take more time)
+
+![](VCM/img/chart2.png)
 
 ### Configure
 
