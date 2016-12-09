@@ -139,7 +139,7 @@ RT_PROGRAM void pathtrace_camera()
     PerRayData_pathtrace prd;
     prd.result = make_float3(0.f);
     prd.attenuation = make_float3(1.f);
-	prd.radiance = make_float3(0.45f, 0.45f, 0.15f);
+	prd.radiance = make_float3(0.05f);
     prd.countEmitted = true;
     prd.done = false;
 	prd.seed = seed;

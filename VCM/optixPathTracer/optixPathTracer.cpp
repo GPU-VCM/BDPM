@@ -85,7 +85,7 @@ Program        pgram_intersection = 0;
 Program        pgram_bounding_box = 0;
 Program        sphere_intersection = 0;
 Program		   sphere_bounding_box = 0;
-
+int amount;
 // Camera state
 float3         camera_up;
 float3         camera_lookat;
@@ -112,8 +112,8 @@ Context	prepass_context = 0;
 float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 100; // number of samples in 360 degrees
-const int nPrePassIteration = 1000;
-const int maxDepth = 5;
+const int nPrePassIteration = 9600;
+const int maxDepth = 3;
 
 std::vector<float3> photonPos;
 std::vector<float3> photonColor;
@@ -307,6 +307,7 @@ void createPrePassContext()
 
 void createContext(std::string filename)
 {
+	amount = 20.f;
     context = Context::create();
     context->setRayTypeCount( 2 );
     context->setEntryPointCount( 1 );
@@ -873,13 +874,37 @@ void glutKeyboardPress( unsigned char k, int x, int y )
             destroyContext();
             exit(0);
         }
-        case( 's' ):
-        {
-            const std::string outputImage = std::string(SAMPLE_NAME) + ".ppm";
-            std::cerr << "Saving current frame to '" << outputImage << "'\n";
-            sutil::displayBufferPPM( outputImage.c_str(), getOutputBuffer() );
-            break;
-        }
+		case('g') :
+		{
+			const std::string outputImage = std::string(SAMPLE_NAME) + ".ppm";
+			std::cerr << "Saving current frame to '" << outputImage << "'\n";
+			sutil::displayBufferPPM(outputImage.c_str(), getOutputBuffer());
+			break;
+		}
+		case('s') :
+		{
+			camera_eye = camera_eye - make_float3(0.f, 0.f, amount);
+			camera_changed = true;
+			break;
+		}
+		case('d') :
+		{
+			camera_eye = camera_eye - make_float3(amount, 0.f, 0.f);
+			camera_changed = true;
+			break;
+		}
+		case('a') :
+		{
+			camera_eye = camera_eye - make_float3(-amount, 0.f, 0.f);
+			camera_changed = true;
+			break;
+		}
+		case('w') :
+		{
+			camera_eye = camera_eye - make_float3(0.f, 0.f, -amount);
+			camera_changed = true;
+			break;
+		}
     }
 }
 
