@@ -49,7 +49,7 @@ Photons are experiencing z-flipping because there're too many photons and if the
 
 ### Analysis
 
-Time cost in the pre-pass:
+Time cost in the pre-pass: (Using Russian-Roulette to terminate the rays randomly, you can see the life time of the rays with high variance)
 
 ![](VCM/img/chart0.png)
 
