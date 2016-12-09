@@ -118,6 +118,12 @@ The following graph shows the time spent (in ms) in calculating DirectLighting. 
 
 ![](VCM/img/time_DLE.png)
 
+###### Memory snapshots and GPU utilization
+
+![](VCM/img/memory_snapshot.PNG)
+
+![](VCM/img/gpu_usage.PNG)
+
 ###### Comparison with Path tracing
 
 | BDPT | MCPT |
