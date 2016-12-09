@@ -30,6 +30,7 @@
 #include "optixPathTracer.h"
 #include "random.h"
 #include <stdio.h>
+#include <time.h>
 
 using namespace optix;
 
@@ -92,6 +93,8 @@ rtBuffer<int>	isHitBuffer;
 
 RT_PROGRAM void pathtrace_camera()
 {
+	/*clock_t start_time = clock();*/
+
     size_t2 screen = output_buffer.size();
 	//int offset = frame_number * screen.x * screen.y * 5;
 	//printf("%d\n", offset);
@@ -203,8 +206,12 @@ RT_PROGRAM void pathtrace_camera()
     // Update the output buffer
     //
     float3 pixel_color = result;
-	
 
+	/*clock_t stop_time = clock();*/
+	
+	//int time = (int)(stop_time - start_time);
+	//double tt = 950000000;
+	//printf("%f\n", (double)time/ tt);
   //  if (frame_number > 1)
   //  {
   //      float a = 1.0f / (float)frame_number;

@@ -58,6 +58,7 @@
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include <OptiXMesh.h>
+#include <time.h>
 
 using namespace optix;
 
@@ -434,7 +435,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
     setMaterial(gis.back(), diffuse, "diffuse_color", red);
 
 
-#define SPHERE
+#define DRAGON
 
 #ifdef SPHERE
 	gis.push_back( createSphere( make_float3(150.0f, 350.0f, 350.0f), 100.0f,
@@ -454,7 +455,7 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
 	mesh.context = crtContext;
-	mesh.material = diffuse;
+	mesh.material = glass;
 
 	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(50.f)));
 	gis.push_back(mesh.geom_instance);
@@ -1047,10 +1048,14 @@ int main( int argc, char** argv )
 		int iteration = nPrePassIteration;
 		while (iteration--)
 		{
+			clock_t start_time = clock();
 			prepass_context[ "frame_number" ]->setUint( prepass_frame_number++ );
 			prepass_context->launch(0, photonSamples, photonSamples);
 			getPrePassPhotonBuffer(); 
 			printf("Frame number:%d\n", prepass_frame_number);
+			clock_t stop_time = clock();
+			int time = (int)(stop_time - start_time);
+			printf("%d\n", time);
 		}
 
 		createContext(contextFileName);

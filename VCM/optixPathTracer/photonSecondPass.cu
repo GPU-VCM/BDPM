@@ -30,6 +30,7 @@
 #include "optixPathTracer.h"
 #include "random.h"
 #include <stdio.h>
+#include <time.h>
 
 using namespace optix;
 
@@ -92,6 +93,7 @@ rtBuffer<ParallelogramLight>     lights;
 
 RT_PROGRAM void pathtrace_camera()
 {
+	clock_t start_time = clock();
     size_t2 screen = output_buffer.size();
 
     float2 inv_screen = 1.0f/make_float2(screen) * 2.f;
@@ -173,7 +175,12 @@ RT_PROGRAM void pathtrace_camera()
     {
         output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
     }
+
+	clock_t stop_time = clock();
 	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
+	int time = (int)(stop_time - start_time);
+	double tt = 950000000;
+	printf("%f\n", (double)time/ tt);
 }
 
 
@@ -221,7 +228,7 @@ RT_PROGRAM void diffuse()
 
     float3 hitpoint = ray.origin + t_hit * ray.direction;
 
-	float radius = gridLength * 0.5f;
+	float radius = gridLength * 0.55f;
 	float resultx = (hitpoint.x - gridMin) / gridLength;
 	float resulty = (hitpoint.y - gridMin) / gridLength;
 	float resultz = (hitpoint.z - gridMin) / gridLength;
