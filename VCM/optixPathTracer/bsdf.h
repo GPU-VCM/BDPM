@@ -167,122 +167,122 @@ public:
     }
 
 	__device__ __forceinline__ float3 EvaluatePhong(
-		const BaseMaterial &aMaterial,
-		const float3    &aLocalDirGen,
-		float          *oDirectPdfW = NULL,
-		float          *oReversePdfW = NULL) const
+		const BaseMaterial &material,
+		const float3    &localGenDirection,
+		float          *dirPdf = NULL,
+		float          *revPdf = NULL) const
 	{
 		if (probabilities.phongProb == 0)
 			return make_float3(0.0f, 0.0f, 0.0f);
 
-		if (localDir.z < EPS_COSINE || aLocalDirGen.z < EPS_COSINE)
+		if (localDir.z < EPS_COSINE || localGenDirection.z < EPS_COSINE)
 			return make_float3(0.0f, 0.0f, 0.0f);
 		const float3 reflLocalDirIn = ReflectLocal(localDir);
-		const float dot_R_Wi = dot(reflLocalDirIn, aLocalDirGen);
+		const float dot_R_Wi = dot(reflLocalDirIn, localGenDirection);
 
 		if (dot_R_Wi <= EPS_PHONG)
 			return make_float3(0.0f, 0.0f, 0.0f);
 
-		if (oDirectPdfW || oReversePdfW)
+		if (dirPdf || revPdf)
 		{
 			// the sampling is symmetric
 			const float pdfW = probabilities.phongProb *
-				PowerCosHemispherePdfW(reflLocalDirIn, aLocalDirGen, aMaterial.exponent);
+				PowerCosHemispherePdfW(reflLocalDirIn, localGenDirection, material.exponent);
 
-			if (oDirectPdfW)
-				*oDirectPdfW  += pdfW;
+			if (dirPdf)
+				*dirPdf  += pdfW;
 
-			if (oReversePdfW)
-				*oReversePdfW += pdfW;
+			if (revPdf)
+				*revPdf += pdfW;
 		}
 
-		const float3 rho = aMaterial.phongPart *
-			(aMaterial.exponent + 2.f) * 0.5f * INV_PI_F;
+		const float3 rho = material.phongPart *
+			(material.exponent + 2.f) * 0.5f * INV_PI_F;
 
-		return rho * pow(dot_R_Wi, aMaterial.exponent);
+		return rho * pow(dot_R_Wi, material.exponent);
 	}
     __device__ __forceinline__ float3 Evaluate(
-        const float3 &aWorldDirGen,
-        float       &oCosThetaGen,
-        float       *oDirectPdfW = NULL,
-        float       *oReversePdfW = NULL) const
+        const float3 &worldSpaceDirection,
+        float       &cosThetaNew,
+        float       *dirPdf = NULL,
+        float       *revPdf = NULL) const
     {
         float3 result = make_float3(0.0f, 0.0f, 0.0f);
 
-        if (oDirectPdfW)  *oDirectPdfW = 0;
-        if (oReversePdfW) *oReversePdfW = 0;
+        if (dirPdf)  *dirPdf = 0;
+        if (revPdf) *revPdf = 0;
 
-        const float3 localDirGen = frame.ToLocal(aWorldDirGen);
+        const float3 localDirGen = frame.ToLocal(worldSpaceDirection);
 
         if (localDirGen.z * localDir.z < 0)
             return result;
 
-        oCosThetaGen = abs(localDirGen.z);
+        cosThetaNew = abs(localDirGen.z);
 
-        result += EvaluateDiffuse(mat, localDirGen, oDirectPdfW, oReversePdfW);
-        result += EvaluatePhong(mat, localDirGen, oDirectPdfW, oReversePdfW);
+        result += EvaluateDiffuse(mat, localDirGen, dirPdf, revPdf);
+        result += EvaluatePhong(mat, localDirGen, dirPdf, revPdf);
 
         return result;
     }
 
 	__device__ __forceinline__ void PdfDiffuse(
-        const BaseMaterial &aMaterial,
-        const float3    &aLocalDirGen,
-        float          *oDirectPdfW = NULL,
-        float          *oReversePdfW = NULL) const
+        const BaseMaterial &material,
+        const float3    &localGenDirection,
+        float          *dirPdf = NULL,
+        float          *revPdf = NULL) const
     {
         if (probabilities.diffProb == 0)
             return;
 
-        if (oDirectPdfW)
-            *oDirectPdfW  += probabilities.diffProb *
-            max(0.f, aLocalDirGen.z * INV_PI_F);
+        if (dirPdf)
+            *dirPdf  += probabilities.diffProb *
+            max(0.f, localGenDirection.z * INV_PI_F);
 
-        if (oReversePdfW)
-            *oReversePdfW += probabilities.diffProb *
+        if (revPdf)
+            *revPdf += probabilities.diffProb *
             max(0.f, localDir.z * INV_PI_F);
     }
 
 	__device__ __forceinline__ void PdfPhong(
-        const BaseMaterial &aMaterial,
-        const float3    &aLocalDirGen,
-        float          *oDirectPdfW = NULL,
-        float          *oReversePdfW = NULL) const
+        const BaseMaterial &material,
+        const float3    &localGenDirection,
+        float          *dirPdf = NULL,
+        float          *revPdf = NULL) const
     {
         if (probabilities.phongProb == 0)
             return;
 
         const float3 reflLocalDirIn = ReflectLocal(localDir);
-        const float dot_R_Wi = dot(reflLocalDirIn, aLocalDirGen);
+        const float dot_R_Wi = dot(reflLocalDirIn, localGenDirection);
 
         if(dot_R_Wi <= EPS_PHONG)
             return;
 
-        if(oDirectPdfW || oReversePdfW)
+        if(dirPdf || revPdf)
         {
-            const float pdfW = PowerCosHemispherePdfW(reflLocalDirIn, aLocalDirGen,
-                aMaterial.exponent) * probabilities.phongProb;
+            const float pdfW = PowerCosHemispherePdfW(reflLocalDirIn, localGenDirection,
+                material.exponent) * probabilities.phongProb;
 
-            if(oDirectPdfW)
-                *oDirectPdfW  += pdfW;
+            if(dirPdf)
+                *dirPdf  += pdfW;
 
-            if(oReversePdfW)
-                *oReversePdfW += pdfW;
+            if(revPdf)
+                *revPdf += pdfW;
         }
     }
 
 	__device__ __forceinline__ float3 SamplePowerCosHemisphereW(
-		const float2  &aSamples,
-		const float  aPower,
-		float        *oPdfW) const
+		const float2  &rnd21,
+		const float  power,
+		float        *pdf) const
 	{
-		const float term1 = 2.f * PI_F * aSamples.x;
-		const float term2 = powf(aSamples.y, 1.f / (aPower + 1.f));
+		const float term1 = 2.f * PI_F * rnd21.x;
+		const float term2 = powf(rnd21.y, 1.f / (power + 1.f));
 		const float term3 = sqrtf(1.f - term2 * term2);
 
-		if (oPdfW)
+		if (pdf)
 		{
-			*oPdfW = (aPower + 1.f) * powf(term2, aPower) * (0.5f * INV_PI_F);
+			*pdf = (power + 1.f) * powf(term2, power) * (0.5f * INV_PI_F);
 		}
 
 		return make_float3(
@@ -292,52 +292,52 @@ public:
 	}
 
 	__device__ __forceinline__ float3 SamplePhong(
-        const BaseMaterial &aMaterial,
-        const float2    &aRndTuple,
-        float3          &oLocalDirGen,
-        float          &oPdfW) const
+        const BaseMaterial &material,
+        const float2    &rnd21,
+        float3          &localDirection,
+        float          &pdf) const
     {
-        oLocalDirGen = SamplePowerCosHemisphereW(aRndTuple, aMaterial.exponent, NULL);
+        localDirection = SamplePowerCosHemisphereW(rnd21, material.exponent, NULL);
         const float3 reflLocalDirFixed = ReflectLocal(localDir);
         {
             Frame frame;
             frame.SetFromZ(reflLocalDirFixed);
-            oLocalDirGen = frame.ToWorld(oLocalDirGen);
+            localDirection = frame.ToWorld(localDirection);
         }
 
-        const float dot_R_Wi = dot(reflLocalDirFixed, oLocalDirGen);
+        const float dot_R_Wi = dot(reflLocalDirFixed, localDirection);
 
         if(dot_R_Wi <= EPS_PHONG)
             return make_float3(0.0f, 0.0f, 0.0f);
 
-        PdfPhong(aMaterial, oLocalDirGen, &oPdfW);
+        PdfPhong(material, localDirection, &pdf);
 
-        const float3 rho = aMaterial.phongPart *
-            (aMaterial.exponent + 2.f) * 0.5f * INV_PI_F;
+        const float3 rho = material.phongPart *
+            (material.exponent + 2.f) * 0.5f * INV_PI_F;
 
-        return rho * pow(dot_R_Wi, aMaterial.exponent);
+        return rho * pow(dot_R_Wi, material.exponent);
     }
 
     __device__ __forceinline__ float3 SampleReflect(
-        const BaseMaterial &aMaterial,
-        const float2    &aRndTuple,
-        float3          &oLocalDirGen,
-        float          &oPdfW) const
+        const BaseMaterial &material,
+        const float2    &rnd21,
+        float3          &localDirection,
+        float          &pdf) const
     {
-        oLocalDirGen = ReflectLocal(localDir);
+        localDirection = ReflectLocal(localDir);
 
-        oPdfW += probabilities.reflProb;
-        return fresnelCoeff * aMaterial.mirror /
-            abs(oLocalDirGen.z);
+        pdf += probabilities.reflProb;
+        return fresnelCoeff * material.mirror /
+            abs(localDirection.z);
     }
 
     __device__ __forceinline__ float3 SampleRefract(
-        const BaseMaterial &aMaterial,
-        const float2    &aRndTuple,
-        float3          &oLocalDirGen,
-        float          &oPdfW) const
+        const BaseMaterial &material,
+        const float2    &rnd21,
+        float3          &localDirection,
+        float          &pdf) const
     {
-        if(aMaterial.ior < 0)
+        if(material.ior < 0)
             return make_float3(0.0f, 0.0f, 0.0f);
 
         float cosI = localDir.z;
@@ -347,13 +347,13 @@ public:
 
         if(cosI < 0.f) 
         {
-            etaIncOverEtaTrans = aMaterial.ior;
+            etaIncOverEtaTrans = material.ior;
             cosI = -cosI;
             cosT = 1.f;
         }
         else
         {
-            etaIncOverEtaTrans = 1.f / aMaterial.ior;
+            etaIncOverEtaTrans = 1.f / material.ior;
             cosT = -1.f;
         }
 
@@ -364,12 +364,12 @@ public:
         {
             cosT *= sqrtf(max(0.f, 1.f - sinT2));
 
-            oLocalDirGen = make_float3(
+            localDirection = make_float3(
                 -etaIncOverEtaTrans * localDir.x,
                 -etaIncOverEtaTrans * localDir.y,
                 cosT);
 
-            oPdfW += probabilities.refrProb;
+            pdf += probabilities.refrProb;
 
             const float refractCoeff = 1.f - fresnelCoeff;
             if(!FixIsLight)
@@ -378,82 +378,82 @@ public:
                 return make_float3(refractCoeff / abs(cosT));
         }
 
-        oPdfW += 0.f;
+        pdf += 0.f;
         return make_float3(0.0f, 0.0f, 0.0f);
     }
 
     __device__ __forceinline__ float3 Sample(
-        const float3 &aRndTriplet,
-        float3       &oWorldDirGen,
-        float       &oPdfW,
-        float       &oCosThetaGen,
-        uint        *oSampledEvent = NULL) const
+        const float3 &rnd31,
+        float3       &worldSpaceDirection,
+        float       &pdf,
+        float       &cosThetaNew,
+        uint        *matType = NULL) const
     {
         uint sampledEvent;
 
-        if (aRndTriplet.z < probabilities.diffProb)
+        if (rnd31.z < probabilities.diffProb)
             sampledEvent = kDiffuse;
-        else if (aRndTriplet.z < probabilities.diffProb + probabilities.phongProb)
+        else if (rnd31.z < probabilities.diffProb + probabilities.phongProb)
             sampledEvent = kPhong;
-        else if (aRndTriplet.z < probabilities.diffProb + probabilities.phongProb + probabilities.reflProb)
+        else if (rnd31.z < probabilities.diffProb + probabilities.phongProb + probabilities.reflProb)
             sampledEvent = kReflect;
         else
             sampledEvent = kRefract;
 
-        if (oSampledEvent)
-            *oSampledEvent = sampledEvent;
+        if (matType)
+            *matType = sampledEvent;
 
-        oPdfW = 0;
+        pdf = 0;
         float3 result = make_float3(0.0f, 0.0f, 0.0f);
         float3 localDirGen;
 
-		const float2 rndSample = make_float2(aRndTriplet.x, aRndTriplet.y);
+		const float2 rndSample = make_float2(rnd31.x, rnd31.y);
 
         if (sampledEvent == kDiffuse)
         {
-            result += SampleDiffuse(mat, rndSample, localDirGen, oPdfW);
+            result += SampleDiffuse(mat, rndSample, localDirGen, pdf);
             
             if (isZero(result))
 				return make_float3(0.0f, 0.0f, 0.0f);
             
-            result += EvaluatePhong(mat, localDirGen, &oPdfW);
+            result += EvaluatePhong(mat, localDirGen, &pdf);
         }
         else if (sampledEvent == kPhong)
         {
-            result += SamplePhong(mat, rndSample, localDirGen, oPdfW);
+            result += SamplePhong(mat, rndSample, localDirGen, pdf);
             
             if (isZero(result))
                 return make_float3(0.0f, 0.0f, 0.0f);
             
-            result += EvaluateDiffuse(mat, localDirGen, &oPdfW);
+            result += EvaluateDiffuse(mat, localDirGen, &pdf);
         }
         else if (sampledEvent == kReflect)
         {
-            result += SampleReflect(mat, rndSample, localDirGen, oPdfW);
+            result += SampleReflect(mat, rndSample, localDirGen, pdf);
 
             if (isZero(result))
                 return make_float3(0.0f, 0.0f, 0.0f);
         }
         else
         {
-            result += SampleRefract(mat, rndSample, localDirGen, oPdfW);
+            result += SampleRefract(mat, rndSample, localDirGen, pdf);
             if (isZero(result))
                 return make_float3(0.0f, 0.0f, 0.0f);
         }
 
-        oCosThetaGen   = abs(localDirGen.z);
-        if (oCosThetaGen < EPS_COSINE)
+        cosThetaNew   = abs(localDirGen.z);
+        if (cosThetaNew < EPS_COSINE)
             return make_float3(0.0f, 0.0f, 0.0f);
 
-        oWorldDirGen = frame.ToWorld(localDirGen);
+        worldSpaceDirection = frame.ToWorld(localDirGen);
         return result;
     }
 
     __device__ __forceinline__ float Pdf(
-        const float3 &aWorldDirGen,
-        const bool aEvalRevPdf = false) const
+        const float3 &worldSpaceDirection,
+        const bool ifRevPdf = false) const
     {
-        const float3 localDirGen = frame.ToLocal(aWorldDirGen);
+        const float3 localDirGen = frame.ToLocal(worldSpaceDirection);
 
         if (localDirGen.z * localDir.z < 0)
             return 0;
@@ -464,7 +464,7 @@ public:
         PdfDiffuse(mat, localDirGen, &directPdfW, &reversePdfW);
         PdfPhong(mat, localDirGen, &directPdfW, &reversePdfW);
 
-        return aEvalRevPdf ? reversePdfW : directPdfW;
+        return ifRevPdf ? reversePdfW : directPdfW;
     }
 };
 

@@ -25,6 +25,10 @@ This test scene has a total of 880,002 tris and 439,909 verts
 
 ![](VCM/img/bdpt_glass.PNG)
 
+![](VCM/img/test_render.PNG)
+
+![](VCM/img/test_render1.PNG)
+
 Debug Screenshots
 -----------------
 
@@ -80,6 +84,14 @@ in my case with a Nvidia 970M card, the shader clock frequency was 1038000Hz.
 This image above, shows a heatmap of sorts with the value of `time / clockRate * scale` being rendered onto the image. The scale was added so that the image doesn't look too blown out.
 With this image, we can clearly tell where most of the time is being spent. The diffuse surfaces: the cow, walls, ceiling and floor have the same general shade implying a lesser time being bottle-necked there and the refractive surfaces: dragon and knot (with ior 1.6) have most close-to-white coloring.
 
+Here is another example:
+
+![](VCM/img/debug_heatmap4_1.PNG)
+
+![](VCM/img/debug_heatmap4_Copy.PNG)
+
+In the above image, it is interesting to note that the edges/outlines in the dragon mesh take longer than other parts of the mesh because of that fact that the material is specular and the calculation is affected more around the edges due to the reflection within the room. The legs also have significant amount of work due to self-reflection. The bunny however is expensive all-around since the triangles are small enough to reflect the diffuse walls around them. The refractive knot (IOR=1.6) is the most expensive to render in this scene.
+
 The following two graphs show a comparison between two methods of `JoinVertices`:
 - **Fast connection** means selecting a light at random to join light subpaths from
 - **No fast connection** means going through the list of all the lights and doing `JoinVertices` for all the light subpaths
@@ -91,6 +103,12 @@ The switch between fast connection is done via `#define FAST_CONNECTION`.
 ![](VCM/img/connectiontype_bdpt.png)
 
 ![](VCM/img/connection_tpye2.png)
+
+The horizontal axis is the ray index.
+
+![](VCM/img/no_fast_spec.PNG)
+
+The graph above shows the time for 1024 rays with two specular meshes and one refractive mesh in the scene.  
 
 Another useful analysis is the number of rays being traced in the scene with 2 refractive objects and 3 diffuse objects:
 
@@ -120,7 +138,12 @@ The following graph shows the time spent (in ms) in calculating DirectLighting. 
 
 ###### Memory snapshots and GPU utilization
 
+
+In this following image, the "Performance & Diagnostics" tool was used from Visual Studio 2013. This screen shot shows the memory utilization during the rendering of the said test scene. There are two refractive (IOR=1.6) objects (dragon and knot) in the scene.  
+
 ![](VCM/img/memory_snapshot.PNG)
+
+This following image shows GPU utilization. This statistic is however meaningless as there is no further useful information other than the GPU is being 100% utilized.
 
 ![](VCM/img/gpu_usage.PNG)
 

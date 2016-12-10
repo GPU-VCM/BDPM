@@ -11,6 +11,7 @@
 !*.lib
 build
 tmp_build
+build_bspm
 
 # Created by https://www.gitignore.io/api/linux,osx,sublimetext,windows,jetbrains,vim,emacs,cmake,c++,cuda,visualstudio,webstorm,eclipse,xcode
 
@@ -197,7 +198,6 @@ install_manifest.txt
 *.slo
 *.lo
 *.o
-#*.obj
 
 # Precompiled Headers
 *.gch
@@ -249,7 +249,6 @@ x86/
 build/
 bld/
 [Bb]in/
-[Oo]bj/
 
 # Visual Studio 2015 cache/options directory
 .vs/
@@ -278,7 +277,6 @@ artifacts/
 *_i.h
 *.ilk
 *.meta
-#*.obj
 *.pch
 *.pdb
 *.pgc
