@@ -106,7 +106,7 @@ The switch between fast connection is done via `#define FAST_CONNECTION`.
 
 The horizontal axis is the ray index.
 
-![](VCM/img/no_fast_spec.PNG)
+![](VCM/img/no_fast_spec.png)
 
 The graph above shows the time for 1024 rays with two specular meshes and one refractive mesh in the scene.  
 
