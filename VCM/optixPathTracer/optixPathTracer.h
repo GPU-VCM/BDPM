@@ -35,13 +35,19 @@ struct ParallelogramLight
     optix::float3 corner;                                                          
     optix::float3 v1, v2;                                                          
     optix::float3 normal;                                                          
-    optix::float3 emission;                                                        
+    optix::float3 emission;
+
+	float getArea(){
+		return optix::length(optix::cross(v1 / optix::dot(v1, v1), v2 / optix::dot(v2, v2)));
+	}
 };                                                                               
 
 struct Photon
 {
 	optix::float3 position;
 	optix::float3 color;
+	float rayPdf;
+	int rayDepth;
 
 	Photon(){}
 
@@ -49,6 +55,8 @@ struct Photon
 	{
 		position = p.position;
 		color = p.color;
+		rayPdf = p.rayPdf;
+		rayDepth = 0;
 	}
 	bool operator()(const Photon &a, const Photon &b) const
 	{

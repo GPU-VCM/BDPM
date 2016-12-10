@@ -47,6 +47,7 @@ struct PerRayData_pathtrace
 
 	float tValue;
 	int isSpecular;
+	float rayPdf;
 };
 
 struct PerRayData_pathtrace_shadow
@@ -104,7 +105,6 @@ RT_PROGRAM void pathtrace_camera()
 
     float3 result = make_float3(0.0f);
 	int index = screen.x*launch_index.y+launch_index.x;
-
 	//float r = sqrt(1.0f - u1u2.x * u1u2.x);
 	//float phi = 2 * M_PI *u1u2.y;
 	//float3 dir = make_float3(cos(phi) * r, -u1u2.x, sin(phi) * r);
@@ -145,6 +145,7 @@ RT_PROGRAM void pathtrace_camera()
 	prd.seed = seed;
     prd.depth = 0;
 	prd.isSpecular = 0;
+	prd.rayPdf = 1.f / (screen.x*screen.y);
 
 	for (int i = 0; i < maxDepth; i++)
 		isHitBuffer[maxDepth * index + i] = 0;
@@ -190,7 +191,9 @@ RT_PROGRAM void pathtrace_camera()
 		photonBuffer[maxDepth * index + prd.depth].position = ray.origin + prd.tValue * ray.direction;
 		photonBuffer[maxDepth * index + prd.depth].color = prd.result;
         prd.depth++;
-        
+		photonBuffer[maxDepth * index + prd.depth].rayDepth = prd.depth;
+		photonBuffer[maxDepth * index + prd.depth].rayPdf = prd.rayPdf;
+
 
         // Update ray data for the next path segment
         ray_origin = prd.origin;
@@ -331,7 +334,9 @@ RT_PROGRAM void diffuse()
     //current_prd.radiance = result;
 	current_prd.radiance *= DECRESE_FACTOR;
 	current_prd.tValue = tValue;
-	
+	current_prd.rayPdf *= 1.f / (2.f * M_PIf);
+	float brdfPdf = M_1_PIf;
+	current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
 	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 
@@ -351,6 +356,9 @@ RT_PROGRAM void specular()
 	current_prd.radiance = current_prd.radiance;
 	current_prd.tValue = tValue;
 	current_prd.isSpecular = 1;
+	current_prd.rayPdf *= 1.f;
+	float brdfPdf = 1.f;
+	current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
 	//printf("SPECULAR\n");
  //   float3 result = make_float3(0.0f);
  //   current_prd.radiance = result;
@@ -449,4 +457,7 @@ RT_PROGRAM void glass_closest_hit_radiance()
 	current_prd.radiance *= DECRESE_FACTOR;
 	current_prd.tValue = tValue;
 	current_prd.isSpecular = 1;
+	current_prd.rayPdf *= 1.f;
+	float brdfPdf = 1.f;
+	current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
 }

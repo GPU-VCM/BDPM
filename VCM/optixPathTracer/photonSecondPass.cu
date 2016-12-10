@@ -44,6 +44,7 @@ struct PerRayData_pathtrace
     int depth;
     int countEmitted;
     int done;
+	float rayPdf;
 };
 
 struct PerRayData_pathtrace_shadow
@@ -224,6 +225,15 @@ RT_PROGRAM void diffuse()
 
     float3 hitpoint = ray.origin + t_hit * ray.direction;
 
+	float z1 = rnd(current_prd.seed);
+	float z2 = rnd(current_prd.seed);
+	float3 p;
+	cosine_sample_hemisphere(z1, z2, p);
+	optix::Onb onb(ffnormal);
+	onb.inverse_transform(p);
+	current_prd.direction = p;
+	current_prd.rayPdf *= M_1_PIf;
+
 	float radius = gridLength * 0.5f;
 	float resultx = (hitpoint.x - gridMin) / gridLength;
 	float resulty = (hitpoint.y - gridMin) / gridLength;
@@ -255,14 +265,14 @@ RT_PROGRAM void diffuse()
 				{
 					if (length(photonBuffer[l].position - hitpoint) < radius)
 					{
-						averageColor += photonBuffer[l].color;
+						float Wmis = current_prd.rayPdf / (current_prd.rayPdf + photonBuffer[l].rayPdf);
+						averageColor += photonBuffer[l].color /** Wmis*/;
 						counter++;
 						//printf("%f %f %f\n",current_prd.attenuation.x,current_prd.attenuation.y, current_prd.attenuation.z);
 					}
 				}
 				
 			}
-
 	//unsigned int num_lights = lights.size();
  //   float3 result = make_float3(0.0f);
 	////result = diffuse_color;
