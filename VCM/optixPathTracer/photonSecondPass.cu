@@ -249,6 +249,9 @@ RT_PROGRAM void diffuse()
 
 	float3 averageColor = make_float3(0.0f);
 	int counter = 0;
+
+	double totalWeight = 0;
+
 	//rtPrintf("color of photonBuffer: %f, %f, %f\n", photonBuffer[0].color.x, photonBuffer[0].color.y, photonBuffer[0].color.z);
 	for (int i = xx + flagx; i <= xx + flagx + 1; i++)
 		for (int j = yy + flagy; j <= yy + flagy + 1; j++)
@@ -266,13 +269,18 @@ RT_PROGRAM void diffuse()
 					if (length(photonBuffer[l].position - hitpoint) < radius)
 					{
 						float Wmis = current_prd.rayPdf / (current_prd.rayPdf + photonBuffer[l].rayPdf);
-						averageColor += photonBuffer[l].color /** Wmis*/;
+						averageColor += photonBuffer[l].color * photonBuffer[l].rayPdf/** Wmis*/;
 						counter++;
+
+						totalWeight += photonBuffer[l].rayPdf;
 						//printf("%f %f %f\n",current_prd.attenuation.x,current_prd.attenuation.y, current_prd.attenuation.z);
 					}
 				}
 				
 			}
+
+	averageColor /= totalWeight;
+	averageColor *= counter;
 	//unsigned int num_lights = lights.size();
  //   float3 result = make_float3(0.0f);
 	////result = diffuse_color;

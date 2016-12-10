@@ -336,7 +336,7 @@ RT_PROGRAM void diffuse()
 	current_prd.tValue = tValue;
 	current_prd.rayPdf *= 1.f / (2.f * M_PIf);
 	float brdfPdf = M_1_PIf;
-	current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
+	//current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
 	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 
@@ -358,7 +358,7 @@ RT_PROGRAM void specular()
 	current_prd.isSpecular = 1;
 	current_prd.rayPdf *= 1.f;
 	float brdfPdf = 1.f;
-	current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
+	//current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
 	//printf("SPECULAR\n");
  //   float3 result = make_float3(0.0f);
  //   current_prd.radiance = result;
@@ -459,5 +459,5 @@ RT_PROGRAM void glass_closest_hit_radiance()
 	current_prd.isSpecular = 1;
 	current_prd.rayPdf *= 1.f;
 	float brdfPdf = 1.f;
-	current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
+	//current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
 }
