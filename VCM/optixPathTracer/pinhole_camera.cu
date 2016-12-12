@@ -653,7 +653,7 @@ RT_PROGRAM void pinhole_camera()
 	atomicAdd(base_output + offset,		time / (1038000.f * scale));
 	atomicAdd(base_output + offset + 1, time / (1038000.f * scale));
 	atomicAdd(base_output + offset + 2, time / (1038000.f * scale));*/
-	rtPrintf("time in pinhole_camera %fms\n", time / 1038000.f);
+	//rtPrintf("time in pinhole_camera %fms\n", time / 1038000.f);
 }
 
 RT_PROGRAM void exception()
