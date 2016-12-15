@@ -34,13 +34,11 @@ rtDeclareVariable(float4, plane, , );
 rtDeclareVariable(float3, v1, , );
 rtDeclareVariable(float3, v2, , );
 rtDeclareVariable(float3, anchor, , );
-//rtDeclareVariable(int, lgt_instance, , ) = {0};
 
 rtDeclareVariable(float3, texcoord, attribute texcoord, ); 
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, ); 
 rtDeclareVariable(float3, shading_normal, attribute shading_normal, ); 
 rtDeclareVariable(float, tValue, attribute tValue, );
-//rtDeclareVariable(int, lgt_idx, attribute lgt_idx, ); 
 rtDeclareVariable(optix::Ray, ray, rtCurrentRay, );
 
 rtBuffer<float3, 1>              Aabb_buffer;
@@ -51,7 +49,6 @@ RT_PROGRAM void intersect(int primIdx)
   float dt = dot(ray.direction, n );
   float t = (plane.w - dot(n, ray.origin))/dt;
   if( t > ray.tmin && t < ray.tmax ) {
-	  //printf("%f %f\n", ray.tmin, ray.tmax);
     float3 p = ray.origin + ray.direction * t;
     float3 vi = p - anchor;
     float a1 = dot(v1, vi);
@@ -63,13 +60,11 @@ RT_PROGRAM void intersect(int primIdx)
           texcoord = make_float3(a1,a2,0);
 		  tValue = t;
 		  
-          //lgt_idx = lgt_instance;
           rtReportIntersection( 0 );
         }
       }
     }
   }
-  //printf("intersected:%d\n", primIdx);
 }
 
 RT_PROGRAM void bounds (int primIdx, float result[6])
@@ -97,12 +92,5 @@ RT_PROGRAM void bounds (int primIdx, float result[6])
 
   	Aabb_buffer[0] = aabb->m_min;
 	Aabb_buffer[1] = aabb->m_max;
-  //printf("bouding:%d\n", primIdx);
   
 }
-
-	//float r = sqrt(1.0f - u1u2.x * u1u2.x);
-	//float phi = 2 * M_PI * u1u2.y;
-	//float theta = M_PI * u1u2.x;
-	//float3 dir = make_float3(cos(phi), cos(theta), sin(phi));
-	//printf("%f %f %f\n", dir.x, dir.y, dir.z);

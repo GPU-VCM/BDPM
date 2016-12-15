@@ -94,27 +94,17 @@ rtBuffer<int>	isHitBuffer;
 RT_PROGRAM void pathtrace_camera()
 {
     size_t2 screen = output_buffer.size();
-	//int offset = frame_number * screen.x * screen.y * 5;
-	//printf("%d\n", offset);
 	unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
-    //float2 u1u2 = make_float2(launch_index) / make_float2(screen);
 	float2 u1u2;
 	u1u2.x = rnd(seed);
 	u1u2.y = rnd(seed);
-	//printf("%d\n", frame_number);
 
     float3 result = make_float3(0.0f);
 	int index = screen.x*launch_index.y+launch_index.x;
-	//float r = sqrt(1.0f - u1u2.x * u1u2.x);
-	//float phi = 2 * M_PI *u1u2.y;
-	//float3 dir = make_float3(cos(phi) * r, -u1u2.x, sin(phi) * r);
-	//printf("%f %f %f\n", dir.x, dir.y, dir.z);
-	//float r = sqrt(1.0f - u1u2.x * u1u2.x);
 	float phi = 2 * M_PI * u1u2.y;
 	float theta = M_PI * 0.5f * u1u2.x;
 	float r = sin(theta);
 	float3 dir = make_float3(r * cos(phi), -cos(theta), r * sin(phi));
-	//printf("%f %f %f\n", dir.x, dir.y, dir.z);
 	
 	int xx = frame_number / row;
 	int yy = frame_number % row;
@@ -124,16 +114,11 @@ RT_PROGRAM void pathtrace_camera()
 	const float z1 = rnd(seed);
 	const float z2 = rnd(seed);
 	const float3 light_pos = light.corner + light.v1 * d * xx + light.v2 * d * yy;
-	//const float3 light_pos = light.corner + light.v1 * 0.5f + light.v2 * 0.5f;
-	//printf("%d %f %f\n",row,  d * xx, d * yy);
-	//printf("%f %f %f\n", light_pos.x, light_pos.y, light_pos.z);
 
     float3 ray_origin = light_pos;
     float3 ray_direction = dir;
-	//printf("%d\n", maxDepth);
 
 	float3 firstRay_direction = ray_direction;
-	//bool firstIntersection = false;
 	float t;
     // Initialze per-ray data
     PerRayData_pathtrace prd;
@@ -151,8 +136,6 @@ RT_PROGRAM void pathtrace_camera()
 		isHitBuffer[maxDepth * index + i] = 0;
     // Each iteration is a segment of the ray path.  The closest hit will
     // return new segments to be traced here.
-	//ray_origin = light.corner + light.v1 * 0.5f + light.v2 * 0.5f;
-	//ray_direction = make_float3(0.0f, -1.0f, 0.0f);
     for(;;)
     {
 		if (prd.depth >= maxDepth)
@@ -168,13 +151,6 @@ RT_PROGRAM void pathtrace_camera()
             prd.result += prd.radiance * prd.attenuation;
             break;
         }
-
-		//if (!firstIntersection)
-		//{
-		//	firstIntersection = true;
-		//	t = prd.tValue;
-		//}
-        // Russian roulette termination 
         if(prd.depth >= rr_begin_depth)
         {
             float pcont = fmaxf(prd.attenuation);
@@ -206,28 +182,6 @@ RT_PROGRAM void pathtrace_camera()
     // Update the output buffer
     //
     float3 pixel_color = result;
-	
-
-  //  if (frame_number > 1)
-  //  {
-  //      float a = 1.0f / (float)frame_number;
-  //      float3 old_color = make_float3(output_buffer[launch_index]);
-  //      output_buffer[launch_index] = make_float4( lerp( old_color, pixel_color, a ), 1.0f );
-		////output_buffer[launch_index] = make_float4(0.5f, 0.0f, 0.0f, 1.0f);
-		////photonBuffer[index * 2 + 1] = lerp( old_color, pixel_color, a );
-		////printf("IN\n");
-  //  }
-  //  else
-  //  {
-  //      output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
-		////photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]);
-  //  }
-	//printf("%f %f %f %f\n", t, firstRay_direction.x, firstRay_direction.y, firstRay_direction.z);
-	//photonBuffer[index * 2] = eye + t * firstRay_direction;
-	//photonBuffer[index * 2 + 1] = make_float3(output_buffer[launch_index]);
-	//photonBuffer[index * 2 + 1] = make_float3(0.5f, 0.0f, 0.0f);
-	//printf("%f %f %f\n", pixel_color.x, pixel_color.y, pixel_color.z);
-	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
 }
 
 
@@ -243,7 +197,6 @@ RT_PROGRAM void diffuseEmitter()
 {
     current_prd.radiance = current_prd.countEmitted ? emission_color : make_float3(0.f);
     current_prd.done = true;
-	//printf("IN\n");
 }
 
 
@@ -262,10 +215,7 @@ rtDeclareVariable(float, tValue, attribute tValue, );
 
 RT_PROGRAM void diffuse()
 {
-	//printf("sasd\n");
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
-	//printf("%f %f %f %f %f %f\n", world_shading_normal.x, world_shading_normal.y, world_shading_normal.z,
-	//	shading_normal.x, shading_normal.y, shading_normal.z);
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 ffnormal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
 
@@ -330,14 +280,10 @@ RT_PROGRAM void diffuse()
 
         }
     }
-
-    //current_prd.radiance = result;
 	current_prd.radiance *= DECRESE_FACTOR;
 	current_prd.tValue = tValue;
 	current_prd.rayPdf *= 1.f / (2.f * M_PIf);
 	float brdfPdf = M_1_PIf;
-	//current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
-	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 
 rtDeclareVariable(float3, world_normal, attribute world_normal, );
@@ -352,17 +298,11 @@ RT_PROGRAM void specular()
 	current_prd.countEmitted = true;
 	unsigned int num_lights = lights.size();
 	float3 result = make_float3(0.0f);
-	//current_prd.radiance = result;
 	current_prd.radiance = current_prd.radiance;
 	current_prd.tValue = tValue;
 	current_prd.isSpecular = 1;
 	current_prd.rayPdf *= 1.f;
 	float brdfPdf = 1.f;
-	//current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
-	//printf("SPECULAR\n");
- //   float3 result = make_float3(0.0f);
- //   current_prd.radiance = result;
-	//current_prd.done = 1;
 }
 
 //-----------------------------------------------------------------------------
@@ -426,14 +366,10 @@ RT_PROGRAM void glass_closest_hit_radiance()
 		realNormal = world_normal;
 		//eta = n1 / n2;
 		cosTheta = -cosTheta;
-		//current_prd.attenuation = make_float3(1.0f, 0.0f, 0.0f);
-		//printf("OUTSIDE\n");
 	}
 	
 	unsigned int seed = t_hit * frame_number;
 	float u01 = rnd(seed);
-	//thrust::uniform_real_distribution<float> u01(0, 1);
-	//thrust::default_random_engine rng = makeSeededRandomEngine(frame_number, launch_index.x + launch_index.y, 0);
 
 	if (u01 < (n2 - n1) / (n2 + n1) * (n2 - n1) / (n2 + n1) + (1 - (n2 - n1) / (n2 + n1) * (n2 - n1) / (n2 + n1)) * pow(1 - cosTheta, 5))
 	{
@@ -442,22 +378,16 @@ RT_PROGRAM void glass_closest_hit_radiance()
 	else
 	{
 		refract(current_prd.direction, ray.direction, world_normal, eta);
-		//glm::vec3 a(d.x, d.y, d.z);
-		//glm::vec3 b(realNormal.x, realNormal.y, realNormal.z);
-		//glm::vec3 c = glm::refract(a, b, eta);
-		//current_prd.direction = make_float3(c.x, c.y, c.z);
 	}
 
-	current_prd.origin = hitpoint;// + ray.direction * 0.01;
+	current_prd.origin = hitpoint;
     current_prd.attenuation = current_prd.attenuation;
     current_prd.countEmitted = true;
 	
     float3 result = make_float3(0.0f);
-    //current_prd.radiance = result;
 	current_prd.radiance *= DECRESE_FACTOR;
 	current_prd.tValue = tValue;
 	current_prd.isSpecular = 1;
 	current_prd.rayPdf *= 1.f;
 	float brdfPdf = 1.f;
-	//current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
 }

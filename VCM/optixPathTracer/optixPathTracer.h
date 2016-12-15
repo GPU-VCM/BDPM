@@ -66,7 +66,6 @@ struct Photon
 	{
 		return position.x < b.position.x;
 	}
-	//int nGridIndex;
 };
 
 

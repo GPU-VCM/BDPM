@@ -102,9 +102,6 @@ RT_PROGRAM void pathtrace_camera()
         //
         unsigned int x = samples_per_pixel%sqrt_num_samples;
         unsigned int y = samples_per_pixel/sqrt_num_samples;
-		//printf("%d %d\n", x, y);
-		//if (launch_index.x==1 && launch_index.y==1)
-		//	printf("sample:%d\n",counter++);
         float2 jitter = make_float2(x-rnd(seed), y-rnd(seed));
         float2 d = pixel + jitter*jitter_scale;
         float3 ray_origin = eye;
@@ -125,7 +122,6 @@ RT_PROGRAM void pathtrace_camera()
         {
 			if (prd.depth > 8)
 				break;
-			//ray_direction = normalize(ray_direction);
             Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
             rtTrace(top_object, ray, prd);
 
@@ -173,7 +169,6 @@ RT_PROGRAM void pathtrace_camera()
     {
         output_buffer[launch_index] = make_float4(pixel_color, 1.0f);
     }
-	//output_buffer[launch_index] += make_float4(0.01f, 0.0f, 0.0f, 1.0f);
 }
 
 
@@ -208,8 +203,6 @@ rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 RT_PROGRAM void diffuse()
 {
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
-	//printf("%f %f %f %f %f %f\n", world_shading_normal.x, world_shading_normal.y, world_shading_normal.z,
-	//	shading_normal.x, shading_normal.y, shading_normal.z);
     float3 world_geometric_normal = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, geometric_normal ) );
     float3 ffnormal = faceforward( world_shading_normal, -ray.direction, world_geometric_normal );
 
@@ -273,15 +266,12 @@ RT_PROGRAM void diffuse()
     }
 
     current_prd.radiance = result;
-	
-	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 
 rtDeclareVariable(float3, world_normal, attribute world_normal, );
 RT_PROGRAM void specular()
 {
     float3 ffnormal = faceforward( world_normal, -ray.direction, world_normal );
-	//printf("normal:%f %f %f\n", ffnormal.x, ffnormal.y, ffnormal.z);
     float3 hitpoint = ray.origin + t_hit * ray.direction;
 
     //
@@ -303,42 +293,7 @@ RT_PROGRAM void specular()
     //
     unsigned int num_lights = lights.size();
     float3 result = make_float3(0.0f);
-	//result = diffuse_color;
-    //for(int i = 0; i < num_lights; ++i)
-    //{
-    //    // Choose random point on light
-    //    ParallelogramLight light = lights[i];
-    //    const float z1 = rnd(current_prd.seed);
-    //    const float z2 = rnd(current_prd.seed);
-    //    const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
-
-    //    // Calculate properties of light sample (for area based pdf)
-    //    const float  Ldist = length(light_pos - hitpoint);
-    //    const float3 L     = normalize(light_pos - hitpoint);
-    //    const float  nDl   = dot( ffnormal, L );
-    //    const float  LnDl  = dot( light.normal, L );
-
-    //    // cast shadow ray
-    //    if ( nDl > 0.0f && LnDl > 0.0f )
-    //    {
-    //        PerRayData_pathtrace_shadow shadow_prd;
-    //        shadow_prd.inShadow = false;
-    //        // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
-    //        Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
-    //        rtTrace(top_object, shadow_ray, shadow_prd);
-
-    //        if(!shadow_prd.inShadow)
-    //        {
-    //            const float A = length(cross(light.v1, light.v2));
-    //            // convert area based pdf to solid angle
-    //            const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-    //            result += light.emission * weight;
-    //        }
-    //    }
-    //}
-
     current_prd.radiance = result;
-	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 
 //-----------------------------------------------------------------------------
@@ -410,22 +365,15 @@ RT_PROGRAM void glass_closest_hit_radiance()
 
 	unsigned int seed = t_hit * frame_number;
 	float u01 = rnd(seed);
-	//thrust::uniform_real_distribution<float> u01(0, 1);
-	//thrust::default_random_engine rng = makeSeededRandomEngine(frame_number, launch_index.x + launch_index.y, 0);
 
 	if (u01 < (n2 - n1) / (n2 + n1) * (n2 - n1) / (n2 + n1) + (1 - (n2 - n1) / (n2 + n1) * (n2 - n1) / (n2 + n1)) * pow(1 - cosTheta, 5))
 	{
 		current_prd.direction = reflect(ray.direction, realNormal);
-		//if (!flag) // avoid bouncing in the glass sphere
-			//current_prd.done = true;
+
 	}
 	else
 	{
 		refract(current_prd.direction, ray.direction, world_normal, eta);
-		//glm::vec3 a(d.x, d.y, d.z);
-		//glm::vec3 b(realNormal.x, realNormal.y, realNormal.z);
-		//glm::vec3 c = glm::refract(a, b, eta);
-		//current_prd.direction = make_float3(c.x, c.y, c.z);
 	}
 
 	current_prd.origin = hitpoint;

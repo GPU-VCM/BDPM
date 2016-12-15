@@ -210,7 +210,6 @@ void setMaterial(
         const float3& color)
 {
     gi->addMaterial(material);
-	//printf("Material:%d\n", gi->getMaterialCount());
     gi[color_name]->setFloat(color);
 }
 
@@ -552,17 +551,6 @@ void updateCamera()
     context[ "U"  ]->setFloat( camera_u );
     context[ "V"  ]->setFloat( camera_v );
     context[ "W"  ]->setFloat( camera_w );
-
-	//float3 F = normalize(camera_lookat - camera_eye);
-	//float3 R = normalize( cross( F, camera_up ) );
-	//float3 U = normalize( cross( R, F ) );
-
-	//glm::mat4x4 projectionMatrix = glm::perspective(fov, aspect_ratio, 0.01f, 1000.f);
-	//glm::mat4x4 viewMatrix = glm::mat4x4(R.x, U.x, F.x, 0.0f,
-	//									 R.y, U.y, F.y, 0.0f,
-	//									 R.z, U.z, F.z, 0.0f,
-	//									 -camera_eye.x, -camera_eye.y, -camera_eye.z, 1.0f);
-	//mvp = projectionMatrix * viewMatrix;
 
     if( camera_changed ) // reset accumulation
         frame_number = 0;
@@ -933,7 +921,6 @@ void glutMouseMotion( int x, int y)
                          static_cast<float>( height );
         const float dmax = fabsf( dx ) > fabs( dy ) ? dx : dy;
         const float scale = std::min<float>( dmax, 0.9f );
-        //camera_eye = camera_eye + (camera_lookat - camera_eye)*scale;
 		camera_eye = camera_eye + normalize(camera_lookat - camera_eye) * 300.f *scale;
 		camera_lookat = camera_lookat + normalize(camera_lookat - camera_eye) * 300.f *scale;
         camera_changed = true;
@@ -953,7 +940,6 @@ void glutMouseMotion( int x, int y)
     }
 	else if( mouse_button == GLUT_MIDDLE_BUTTON )
 	{
-		//printf("MIDDLE\n");
 		const float dx = static_cast<float>( x - mouse_prev_pos.x ) /
 			static_cast<float>( width );
 		const float dy = static_cast<float>( y - mouse_prev_pos.y ) /
