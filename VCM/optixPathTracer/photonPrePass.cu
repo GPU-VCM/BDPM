@@ -139,7 +139,7 @@ RT_PROGRAM void pathtrace_camera()
     PerRayData_pathtrace prd;
     prd.result = make_float3(0.f);
     prd.attenuation = make_float3(1.f);
-	prd.radiance = make_float3(0.15f);
+	prd.radiance = make_float3(0.15f) * 0.5;
     prd.countEmitted = true;
     prd.done = false;
 	prd.seed = seed;
@@ -190,8 +190,8 @@ RT_PROGRAM void pathtrace_camera()
 
 		// Be careful of calculating the indices!
 		photonBuffer[maxDepth * index + prd.depth].position = ray.origin + prd.tValue * ray.direction;
-		//photonBuffer[maxDepth * index + prd.depth].color = prd.result;
-		photonBuffer[maxDepth * index + prd.depth].color = make_float3(prd.rayPdf * 10);
+		photonBuffer[maxDepth * index + prd.depth].color = prd.result;
+		//photonBuffer[maxDepth * index + prd.depth].color = make_float3(prd.rayPdf * 10);
 		//if (prd.depth == 0)
 		//	photonBuffer[maxDepth * index + prd.depth].rayPdf = 0;
 		//else
@@ -468,4 +468,28 @@ RT_PROGRAM void glass_closest_hit_radiance()
 	current_prd.rayPdf *= 1.f;
 	float brdfPdf = 1.f;
 	//current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
+}
+
+RT_PROGRAM void metal()
+{
+	float3 ffnormal = faceforward( world_normal, -ray.direction, world_normal );
+	float3 hitpoint = ray.origin + t_hit * ray.direction;
+	current_prd.origin = hitpoint;
+	float3 R = reflect(ray.direction, ffnormal);
+	current_prd.direction = R;
+	current_prd.attenuation = current_prd.attenuation;
+	current_prd.countEmitted = true;
+	unsigned int num_lights = lights.size();
+	float3 result = make_float3(0.0f);
+	//current_prd.radiance = result;
+	current_prd.radiance = current_prd.radiance;
+	current_prd.tValue = tValue;
+	current_prd.isSpecular = 1;
+	current_prd.rayPdf *= 1.f;
+	float brdfPdf = 1.f;
+	//current_prd.attenuation *= current_prd.rayPdf / (brdfPdf + current_prd.rayPdf);
+	//printf("SPECULAR\n");
+ //   float3 result = make_float3(0.0f);
+ //   current_prd.radiance = result;
+	//current_prd.done = 1;
 }

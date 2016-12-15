@@ -38,6 +38,7 @@ rtDeclareVariable(float3, anchor, , );
 
 rtDeclareVariable(float3, texcoord, attribute texcoord, ); 
 rtDeclareVariable(float3, geometric_normal, attribute geometric_normal, ); 
+rtDeclareVariable(float3, world_normal, attribute world_normal, ); 
 rtDeclareVariable(float3, shading_normal, attribute shading_normal, ); 
 rtDeclareVariable(float, tValue, attribute tValue, );
 //rtDeclareVariable(int, lgt_idx, attribute lgt_idx, ); 
@@ -59,7 +60,7 @@ RT_PROGRAM void intersect(int primIdx)
       float a2 = dot(v2, vi);
       if(a2 >= 0 && a2 <= 1){
         if( rtPotentialIntersection( t ) ) {
-          shading_normal = geometric_normal = n;
+          world_normal = shading_normal = geometric_normal = n;
           texcoord = make_float3(a1,a2,0);
 		  tValue = t;
 		  

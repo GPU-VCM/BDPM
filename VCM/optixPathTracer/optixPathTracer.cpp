@@ -64,9 +64,9 @@ using namespace optix;
 const char* const SAMPLE_NAME = "optixPathTracer";
 
 #define MAX_PHOTON 20000000
-#define DRAWPHOTON
-//const std::string contextFileName = "photonSecondPass.cu";
-const std::string contextFileName = "optixPathTracer.cu";
+//#define DRAWPHOTON
+const std::string contextFileName = "photonSecondPass.cu";
+//const std::string contextFileName = "optixPathTracer.cu";
 //------------------------------------------------------------------------------
 //
 // Globals
@@ -112,7 +112,7 @@ Context	prepass_context = 0;
 float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 100; // number of samples in 360 degrees
-const int nPrePassIteration = 1000;
+const int nPrePassIteration = 2000;
 const int maxDepth = 3;
 
 std::vector<float3> photonPos;
@@ -381,6 +381,12 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	glass->setClosestHitProgram(0, glass_ch);
 	glass->setAnyHitProgram(1, glass_ah);
 
+	Material metal = crtContext->createMaterial();
+	Program metal_ch = crtContext->createProgramFromPTXFile(ptx_path, "metal");
+	Program metal_ah = crtContext->createProgramFromPTXFile(ptx_path, "shadow");
+	metal->setClosestHitProgram(0, metal_ch);
+	metal->setAnyHitProgram(1, metal_ah);
+
     // Set up parallelogram programs
     ptx_path = ptxPath( "parallelogram.cu" );
     pgram_bounding_box = crtContext->createProgramFromPTXFile( ptx_path, "bounds" );
@@ -436,8 +442,64 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 										crtContext ) );
     setMaterial(gis.back(), diffuse, "diffuse_color", red);
 
+#define BLOCK
+	Material &blockMaterial = metal;
+#ifdef BLOCK
+	// Short block
+	gis.push_back( createParallelogram( make_float3( 130.0f, 165.0f, 65.0f),
+		make_float3( -48.0f, 0.0f, 160.0f),
+		make_float3( 160.0f, 0.0f, 49.0f),
+		crtContext) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+	gis.push_back( createParallelogram( make_float3( 290.0f, 0.0f, 114.0f),
+		make_float3( 0.0f, 165.0f, 0.0f),
+		make_float3( -50.0f, 0.0f, 158.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+	gis.push_back( createParallelogram( make_float3( 130.0f, 0.0f, 65.0f),
+		make_float3( 0.0f, 165.0f, 0.0f),
+		make_float3( 160.0f, 0.0f, 49.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+	gis.push_back( createParallelogram( make_float3( 82.0f, 0.0f, 225.0f),
+		make_float3( 0.0f, 165.0f, 0.0f),
+		make_float3( 48.0f, 0.0f, -160.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+	gis.push_back( createParallelogram( make_float3( 240.0f, 0.0f, 272.0f),
+		make_float3( 0.0f, 165.0f, 0.0f),
+		make_float3( -158.0f, 0.0f, -47.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
 
-#define COW
+	// Tall block
+	gis.push_back( createParallelogram( make_float3( 423.0f, 330.0f, 247.0f),
+		make_float3( -158.0f, 0.0f, 49.0f),
+		make_float3( 49.0f, 0.0f, 159.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+	gis.push_back( createParallelogram( make_float3( 423.0f, 0.0f, 247.0f),
+		make_float3( 0.0f, 330.0f, 0.0f),
+		make_float3( 49.0f, 0.0f, 159.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+	gis.push_back( createParallelogram( make_float3( 472.0f, 0.0f, 406.0f),
+		make_float3( 0.0f, 330.0f, 0.0f),
+		make_float3( -158.0f, 0.0f, 50.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+	gis.push_back( createParallelogram( make_float3( 314.0f, 0.0f, 456.0f),
+		make_float3( 0.0f, 330.0f, 0.0f),
+		make_float3( -49.0f, 0.0f, -160.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+	gis.push_back( createParallelogram( make_float3( 265.0f, 0.0f, 296.0f),
+		make_float3( 0.0f, 330.0f, 0.0f),
+		make_float3( 158.0f, 0.0f, -49.0f),
+		crtContext ) );
+	setMaterial(gis.back(), blockMaterial, "diffuse_color", white);
+#endif
+
 
 #ifdef SPHERE
 	gis.push_back( createSphere( make_float3(150.0f, 350.0f, 350.0f), 100.0f,
@@ -837,6 +899,8 @@ void drawPhoton()
 
 void glutDisplay()
 {
+	if (frame_number > 10)
+		return;
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClearDepth(1.0);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

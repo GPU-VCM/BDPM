@@ -46,6 +46,8 @@ struct PerRayData_pathtrace
     int done;
 	float rayPdf;
 	float previousRayPdf;
+
+	bool isBpm;
 };
 
 struct PerRayData_pathtrace_shadow
@@ -123,6 +125,7 @@ RT_PROGRAM void pathtrace_camera()
     prd.depth = 0;
 	prd.rayPdf = 1;
 	prd.previousRayPdf = 1;
+	prd.isBpm = true;
     // Each iteration is a segment of the ray path.  The closest hit will
     // return new segments to be traced here.
     for(;;)
@@ -150,10 +153,12 @@ RT_PROGRAM void pathtrace_camera()
             //prd.attenuation /= pcont;
         }
         prd.depth++;
-		if (launch_index.x == 200 && launch_index.y==200)
-			printf("%d %f %f\n", prd.depth, prd.previousRayPdf, (1 - prd.rayPdf));
-        prd.result += prd.previousRayPdf * (1 - prd.rayPdf) * prd.radiance * prd.attenuation;
-
+		//if (launch_index.x == 200 && launch_index.y==200)
+		//	printf("%d %f %f\n", prd.depth, prd.previousRayPdf, (1 - prd.rayPdf));
+		if (prd.isBpm)
+			prd.result += prd.previousRayPdf * (1 - prd.rayPdf) * prd.radiance * prd.attenuation;
+		else
+			prd.result += prd.radiance * prd.attenuation;
         // Update ray data for the next path segment
         ray_origin = prd.origin;
         ray_direction = prd.direction;
@@ -219,7 +224,8 @@ rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
 RT_PROGRAM void diffuse()
 {
-	//current_prd.done = true;
+	//if (!prd.isBpm)
+	//	current_prd.done = true;
 
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
 	//printf("%f %f %f %f %f %f\n", world_shading_normal.x, world_shading_normal.y, world_shading_normal.z,
@@ -275,8 +281,10 @@ RT_PROGRAM void diffuse()
 					if (length(photonBuffer[l].position - hitpoint) < radius)
 					{
 						float Wmis = current_prd.rayPdf / (current_prd.rayPdf + photonBuffer[l].rayPdf);
-						averageColor += photonBuffer[l].color * photonBuffer[l].rayPdf/** Wmis*/;
-						//averageColor += photonBuffer[l].color;
+						if (current_prd.isBpm)
+							averageColor += photonBuffer[l].color * photonBuffer[l].rayPdf/** Wmis*/;
+						else
+							averageColor += photonBuffer[l].color;
 						counter++;
 						//totalWeight += 1.f;
 						totalWeight += photonBuffer[l].rayPdf;
@@ -285,9 +293,11 @@ RT_PROGRAM void diffuse()
 				}
 				
 			}
-
-	averageColor /= totalWeight;
-	averageColor *= counter;
+	if (current_prd.isBpm)
+	{
+		averageColor /= totalWeight;
+		averageColor *= counter;
+	}
 	//unsigned int num_lights = lights.size();
  //   float3 result = make_float3(0.0f);
 	////result = diffuse_color;
@@ -336,64 +346,15 @@ rtDeclareVariable(float3, world_normal, attribute world_normal, );
 RT_PROGRAM void specular()
 {
     float3 ffnormal = faceforward( world_normal, -ray.direction, world_normal );
-	//printf("normal:%f %f %f\n", ffnormal.x, ffnormal.y, ffnormal.z);
     float3 hitpoint = ray.origin + t_hit * ray.direction;
-
-    //
-    // Generate a reflection ray.  This will be traced back in ray-gen.
-    //
     current_prd.origin = hitpoint;
-
     float3 R = reflect(ray.direction, ffnormal);
     current_prd.direction = R;
-
-    // NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
-    // with cosine density.
     current_prd.attenuation = current_prd.attenuation;
     current_prd.countEmitted = true;
-
-
-    //
-    // Next event estimation (compute direct lighting).
-    //
     unsigned int num_lights = lights.size();
     float3 result = make_float3(0.0f);
-	//result = diffuse_color;
-    //for(int i = 0; i < num_lights; ++i)
-    //{
-    //    // Choose random point on light
-    //    ParallelogramLight light = lights[i];
-    //    const float z1 = rnd(current_prd.seed);
-    //    const float z2 = rnd(current_prd.seed);
-    //    const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
-
-    //    // Calculate properties of light sample (for area based pdf)
-    //    const float  Ldist = length(light_pos - hitpoint);
-    //    const float3 L     = normalize(light_pos - hitpoint);
-    //    const float  nDl   = dot( ffnormal, L );
-    //    const float  LnDl  = dot( light.normal, L );
-
-    //    // cast shadow ray
-    //    if ( nDl > 0.0f && LnDl > 0.0f )
-    //    {
-    //        PerRayData_pathtrace_shadow shadow_prd;
-    //        shadow_prd.inShadow = false;
-    //        // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
-    //        Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
-    //        rtTrace(top_object, shadow_ray, shadow_prd);
-
-    //        if(!shadow_prd.inShadow)
-    //        {
-    //            const float A = length(cross(light.v1, light.v2));
-    //            // convert area based pdf to solid angle
-    //            const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-    //            result += light.emission * weight;
-    //        }
-    //    }
-    //}
-
     current_prd.radiance = result;
-	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 
 //-----------------------------------------------------------------------------
@@ -482,6 +443,20 @@ RT_PROGRAM void glass_closest_hit_radiance()
     current_prd.attenuation = current_prd.attenuation;
     current_prd.countEmitted = true;
 	
+    float3 result = make_float3(0.0f);
+    current_prd.radiance = result;
+}
+
+RT_PROGRAM void metal()
+{
+    float3 ffnormal = faceforward( world_normal, -ray.direction, world_normal );
+    float3 hitpoint = ray.origin + t_hit * ray.direction;
+    current_prd.origin = hitpoint;
+    float3 R = reflect(ray.direction, ffnormal);
+    current_prd.direction = R;
+    current_prd.attenuation = current_prd.attenuation;
+    current_prd.countEmitted = true;
+    unsigned int num_lights = lights.size();
     float3 result = make_float3(0.0f);
     current_prd.radiance = result;
 }

@@ -281,64 +281,15 @@ rtDeclareVariable(float3, world_normal, attribute world_normal, );
 RT_PROGRAM void specular()
 {
     float3 ffnormal = faceforward( world_normal, -ray.direction, world_normal );
-	//printf("normal:%f %f %f\n", ffnormal.x, ffnormal.y, ffnormal.z);
     float3 hitpoint = ray.origin + t_hit * ray.direction;
-
-    //
-    // Generate a reflection ray.  This will be traced back in ray-gen.
-    //
     current_prd.origin = hitpoint;
-
     float3 R = reflect(ray.direction, ffnormal);
     current_prd.direction = R;
-
-    // NOTE: f/pdf = 1 since we are perfectly importance sampling lambertian
-    // with cosine density.
     current_prd.attenuation = current_prd.attenuation;
     current_prd.countEmitted = true;
-
-
-    //
-    // Next event estimation (compute direct lighting).
-    //
     unsigned int num_lights = lights.size();
     float3 result = make_float3(0.0f);
-	//result = diffuse_color;
-    //for(int i = 0; i < num_lights; ++i)
-    //{
-    //    // Choose random point on light
-    //    ParallelogramLight light = lights[i];
-    //    const float z1 = rnd(current_prd.seed);
-    //    const float z2 = rnd(current_prd.seed);
-    //    const float3 light_pos = light.corner + light.v1 * z1 + light.v2 * z2;
-
-    //    // Calculate properties of light sample (for area based pdf)
-    //    const float  Ldist = length(light_pos - hitpoint);
-    //    const float3 L     = normalize(light_pos - hitpoint);
-    //    const float  nDl   = dot( ffnormal, L );
-    //    const float  LnDl  = dot( light.normal, L );
-
-    //    // cast shadow ray
-    //    if ( nDl > 0.0f && LnDl > 0.0f )
-    //    {
-    //        PerRayData_pathtrace_shadow shadow_prd;
-    //        shadow_prd.inShadow = false;
-    //        // Note: bias both ends of the shadow ray, in case the light is also present as geometry in the scene.
-    //        Ray shadow_ray = make_Ray( hitpoint, L, pathtrace_shadow_ray_type, scene_epsilon, Ldist - scene_epsilon );
-    //        rtTrace(top_object, shadow_ray, shadow_prd);
-
-    //        if(!shadow_prd.inShadow)
-    //        {
-    //            const float A = length(cross(light.v1, light.v2));
-    //            // convert area based pdf to solid angle
-    //            const float weight = nDl * LnDl * A / (M_PIf * Ldist * Ldist);
-    //            result += light.emission * weight;
-    //        }
-    //    }
-    //}
-
     current_prd.radiance = result;
-	//current_prd.radiance = make_float3(1.0f, 1.0f, 1.0f);
 }
 
 //-----------------------------------------------------------------------------
@@ -432,6 +383,20 @@ RT_PROGRAM void glass_closest_hit_radiance()
     current_prd.attenuation = current_prd.attenuation;
     current_prd.countEmitted = true;
 	
+    float3 result = make_float3(0.0f);
+    current_prd.radiance = result;
+}
+
+RT_PROGRAM void metal()
+{
+    float3 ffnormal = faceforward( world_normal, -ray.direction, world_normal );
+    float3 hitpoint = ray.origin + t_hit * ray.direction;
+    current_prd.origin = hitpoint;
+    float3 R = reflect(ray.direction, ffnormal);
+    current_prd.direction = R;
+    current_prd.attenuation = current_prd.attenuation;
+    current_prd.countEmitted = true;
+    unsigned int num_lights = lights.size();
     float3 result = make_float3(0.0f);
     current_prd.radiance = result;
 }
