@@ -261,3 +261,5 @@ Time cost in the second-pass: (cornell box scene with diffuse walls and a glass 
 * [Optix performance guidelines](https://docs.nvidia.com/gameworks/index.html#gameworkslibrary/optix/optix_performance_guidelines.htm%3FTocPath%3DGameWorks%2520Library%7COptiX%7COptiX%25204.0%7COptiX%2520Programming%2520Guide%7C_____10)
 * [Timing with CUDA events on SO](http://stackoverflow.com/questions/6959213/timing-a-cuda-application-using-events)
 * [How to Implement Performance Metrics in CUDA C/C++](https://devblogs.nvidia.com/parallelforall/how-implement-performance-metrics-cuda-cc/)
+
+Code made and maintained by: [Akshay Shah](https://www.linkedin.com/in/akshaymshah), Kaixiang Miao
