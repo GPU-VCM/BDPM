@@ -45,6 +45,7 @@ struct PerRayData_pathtrace
     int countEmitted;
     int done;
 	float rayPdf;
+	float previousRayPdf;
 };
 
 struct PerRayData_pathtrace_shadow
@@ -104,64 +105,64 @@ RT_PROGRAM void pathtrace_camera()
     float3 result = make_float3(0.0f);
 
     unsigned int seed = tea<16>(screen.x*launch_index.y+launch_index.x, frame_number);
-	
+	float2 d = pixel;
+    float3 ray_origin = eye;
+    float3 ray_direction = normalize(d.x*U + d.y*V + W);
+
+    // Initialze per-ray data
+    PerRayData_pathtrace prd;
+    prd.result = make_float3(0.f);
+    prd.attenuation = make_float3(1.f);
+    prd.countEmitted = true;
+    prd.done = false;
+    prd.seed = seed;
+    prd.depth = 0;
+	prd.rayPdf = 1;
+	prd.previousRayPdf = 1;
+    // Each iteration is a segment of the ray path.  The closest hit will
+    // return new segments to be traced here.
+    for(;;)
     {
-		float2 d = pixel;
-        float3 ray_origin = eye;
-        float3 ray_direction = normalize(d.x*U + d.y*V + W);
-
-        // Initialze per-ray data
-        PerRayData_pathtrace prd;
-        prd.result = make_float3(0.f);
-        prd.attenuation = make_float3(1.f);
-        prd.countEmitted = true;
-        prd.done = false;
-        prd.seed = seed;
-        prd.depth = 0;
-
-        // Each iteration is a segment of the ray path.  The closest hit will
-        // return new segments to be traced here.
-        for(;;)
+		if (prd.depth > 8)
+			break;
+        Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
+        rtTrace(top_object, ray, prd);
+			
+        if(prd.done)
         {
-			if (prd.depth > 8)
-				break;
-			
-            Ray ray = make_Ray(ray_origin, ray_direction, pathtrace_ray_type, scene_epsilon, RT_DEFAULT_MAX);
-            rtTrace(top_object, ray, prd);
-			
-            if(prd.done)
-            {
-                // We have hit the background or a luminaire
-                prd.result += prd.radiance * prd.attenuation;
-                break;
-            }
-
-            // Russian roulette termination 
-            if(prd.depth >= rr_begin_depth)
-            {
-                float pcont = fmaxf(prd.attenuation);
-                if(rnd(prd.seed) >= pcont)
-                    break;
-                prd.attenuation /= pcont;
-            }
-
-            prd.depth++;
+            // We have hit the background or a luminaire
             prd.result += prd.radiance * prd.attenuation;
-
-            // Update ray data for the next path segment
-            ray_origin = prd.origin;
-            ray_direction = prd.direction;
+            break;
         }
 
-        result += prd.result;
-        seed = prd.seed;
+        // Russian roulette termination 
+        if(prd.depth >= 2)
+        {
+            float pcont = fmaxf(prd.attenuation);
+            if(rnd(prd.seed) >= pcont)
+                break;
+            //prd.attenuation /= pcont;
+        }
+        prd.depth++;
+		if (launch_index.x == 200 && launch_index.y==200)
+			printf("%d %f %f\n", prd.depth, prd.previousRayPdf, (1 - prd.rayPdf));
+        prd.result += prd.previousRayPdf * (1 - prd.rayPdf) * prd.radiance * prd.attenuation;
+
+        // Update ray data for the next path segment
+        ray_origin = prd.origin;
+        ray_direction = prd.direction;
     }
+
+    result += prd.result;
+    seed = prd.seed;
+    
 
     //
     // Update the output buffer
     //
     float3 pixel_color = result;
-	
+	//if (launch_index.x == 200 && launch_index.y==200)
+	//	printf("%d %f %f %f\n", prd.depth, result.x, result.y, result.z);
 	
     if (frame_number > 0)
     {
@@ -225,7 +226,9 @@ RT_PROGRAM void diffuse()
 	cosine_sample_hemisphere(z1, z2, p);
 	optix::Onb onb(ffnormal);
 	onb.inverse_transform(p);
+	current_prd.origin = hitpoint;
 	current_prd.direction = p;
+	current_prd.previousRayPdf = current_prd.rayPdf;
 	current_prd.rayPdf *= M_1_PIf;
 
 	float radius = gridLength * 0.25f;
@@ -262,9 +265,9 @@ RT_PROGRAM void diffuse()
 					if (length(photonBuffer[l].position - hitpoint) < radius)
 					{
 						float Wmis = current_prd.rayPdf / (current_prd.rayPdf + photonBuffer[l].rayPdf);
+
 						averageColor += photonBuffer[l].color * photonBuffer[l].rayPdf;
 						counter++;
-
 						totalWeight += photonBuffer[l].rayPdf;
 					}
 				}
