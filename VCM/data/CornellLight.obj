@@ -1,0 +1,18 @@
+# 3ds Max Wavefront OBJ Exporter v0.97b - (c)2007 guruware
+# File Created: 20.02.2014 21:44:11
+
+#
+# object Light
+#
+
+v  2.0544 5.4980 -3.6249
+v  2.0544 5.4980 -2.0249
+v  3.6544 5.4980 -3.6249
+v  3.6544 5.4980 -2.0249
+# 4 vertices
+
+g Light
+f 3 2 1
+f 2 3 4
+# 2 faces
+

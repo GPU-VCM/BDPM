@@ -1,0 +1,19 @@
+# This file uses centimeters as units for non-parametric coordinates.
+
+mtllib CornellRedWall.mtl
+g default
+v 5.500000 5.500000 0.000000
+v 5.500000 5.500000 -5.500000
+v 5.500000 0.000000 -5.500000
+v 5.500000 0.000000 0.000000
+vn -1.000000 0.000000 -0.000000
+vn -1.000000 0.000000 -0.000000
+vn -1.000000 0.000000 -0.000000
+vn -1.000000 0.000000 -0.000000
+vn -1.000000 0.000000 -0.000000
+vn -1.000000 0.000000 -0.000000
+s off
+g CornellBlueWall:blueWall
+usemtl initialShadingGroup
+f 1//1 2//2 3//3
+f 1//4 3//5 4//6
