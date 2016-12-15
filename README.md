@@ -32,8 +32,8 @@ In terms of what we learnt during the implementation of this algorithm is that, 
 OptiX however offers a lot of in-built functionalities like BVH acceleration structures and intersection frameworks. This however can get in the way if you want to learn Path tracing as a whole. This API is **not** suitable for those who are just beginning out to learn about Path tracing.
 
 
-| BDPM | PM | BDPT | PT |
-| ---- | -- | ---- | -- |
+| BDPM                                | PM                                 | BDPT                                 | PT                                 |
+| :---------------------------------: | :--------------------------------: | :----------------------------------: | :--------------------------------: |
 | ![](VCM/img/final/bpm_frame_10.jpg) | ![](VCM/img/final/pm_frame_10.jpg) | ![](VCM/img/final/frame_10_bdpt.PNG) | ![](VCM/img/final/pt_frame_10.jpg) |
 
 
