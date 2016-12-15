@@ -20,7 +20,7 @@
 Bidirectional Photon mapping is an unbiased algorithm that uses techniques from bidirectional path tracing and photon mapping. It is a two-pass algorithm similar to that of photon mapping. The main differences between BDPM and PM & BDPT are:
 1.  The first pass differs by adding path weights to the photon paths in terms of their probabilities, like so,
 
-    ![](VCM/img/first_pass.PNG)
+![](VCM/img/first_pass.PNG)
 2. The second pass incorporates MIS weights from the number of `t` bounces (i.e., the camera rays) by also using the probabilities stored with photon paths.
 
 The main drawback of this method currently is that progressive methods is not possible but can be added.
@@ -29,6 +29,10 @@ In terms of what we learnt during the implementation of this algorithm is that, 
 
 OptiX however offers a lot of in-built functionalities like BVH acceleration structures and intersection frameworks. This however can get in the way if you want to learn Path tracing as a whole. This API is **not** suitable for those who are just beginning out to learn about Path tracing.
 
+
+| BDPM | PM | BDPT | PT |
+| ---- | -- | ---- | -- |
+| ![](VCM/img/final/bpm_frame_10.jpg) | ![](VCM/img/final/pm_frame_10.jpg) | ![](VCM/img/final/frame_10_bdpt.PNG) | ![](VCM/img/final/pt_frame_10.jpg) |
 
 #### What is Bidirectional Path Tracing?
 
