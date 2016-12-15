@@ -74,8 +74,8 @@ const char* const SAMPLE_NAME = "optixPathTracer";
 //------------------------------------------------------------------------------
 
 Context        context = 0;
-uint32_t       width = 1024;
-uint32_t       height = 768;
+uint32_t       width = 600;
+uint32_t       height = 600;
 bool           use_pbo = true;
 
 int            frame_number = 1;
