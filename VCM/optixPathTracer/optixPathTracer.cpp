@@ -65,8 +65,8 @@ const char* const SAMPLE_NAME = "optixPathTracer";
 
 #define MAX_PHOTON 20000000
 //#define DRAWPHOTON
-const std::string contextFileName = "photonSecondPass.cu";
-//const std::string contextFileName = "optixPathTracer.cu";
+//const std::string contextFileName = "photonSecondPass.cu";
+const std::string contextFileName = "optixPathTracer.cu";
 //------------------------------------------------------------------------------
 //
 // Globals
@@ -123,8 +123,8 @@ int validPhoton;
 #define MAX_GRID 3000000
 int gridStartIndex[MAX_GRID];
 int gridEndIndex[MAX_GRID];
-const float gridLength = 30.f;
-const int gridSideCount = 20;
+const float gridLength = 20.f;
+const int gridSideCount = 30;
 const float gridSideLength = gridLength * gridSideCount;
 const float gridMin = -10.f;
 std::vector<std::pair<Photon, int>> vPhotonGrid;
@@ -456,11 +456,11 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
 	mesh.context = crtContext;
-	mesh.material = specular;
+	mesh.material = glass;
 
-	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(3000.f)));
+	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(50.f)));
 	gis.push_back(mesh.geom_instance);
-	gis.back()["diffuse_color"]->setFloat(red);
+	//gis.back()["diffuse_color"]->setFloat(red);
 	//setMaterial(gis.back(), diffuse, "diffuse_color", red);
 #endif
 

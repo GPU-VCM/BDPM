@@ -124,13 +124,14 @@ RT_PROGRAM void pathtrace_camera()
     PerRayData_pathtrace prd;
     prd.result = make_float3(0.f);
     prd.attenuation = make_float3(1.f);
-	prd.radiance = make_float3(0.05f);
+	prd.radiance = make_float3(0.15f);
     prd.countEmitted = true;
     prd.done = false;
 	prd.seed = seed;
     prd.depth = 0;
 	prd.isSpecular = 0;
-	prd.rayPdf = 1.f / (screen.x*screen.y);
+	/*prd.rayPdf = 1.f / (screen.x*screen.y);*/
+	prd.rayPdf = 1.f;
 
 	for (int i = 0; i < maxDepth; i++)
 		isHitBuffer[maxDepth * index + i] = 0;
@@ -165,10 +166,17 @@ RT_PROGRAM void pathtrace_camera()
 
 		// Be careful of calculating the indices!
 		photonBuffer[maxDepth * index + prd.depth].position = ray.origin + prd.tValue * ray.direction;
-		photonBuffer[maxDepth * index + prd.depth].color = prd.result;
+		//photonBuffer[maxDepth * index + prd.depth].color = prd.result;
+		photonBuffer[maxDepth * index + prd.depth].color = make_float3(prd.rayPdf * 10);
+		//if (prd.depth == 0)
+		//	photonBuffer[maxDepth * index + prd.depth].rayPdf = 0;
+		//else
+			photonBuffer[maxDepth * index + prd.depth].rayPdf = prd.rayPdf;
+		//if (index == 200)
+		//	printf("%f\n", photonBuffer[maxDepth * index + prd.depth].rayPdf);
         prd.depth++;
 		photonBuffer[maxDepth * index + prd.depth].rayDepth = prd.depth;
-		photonBuffer[maxDepth * index + prd.depth].rayPdf = prd.rayPdf;
+		
 
 
         // Update ray data for the next path segment
