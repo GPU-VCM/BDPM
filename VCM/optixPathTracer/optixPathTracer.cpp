@@ -112,7 +112,7 @@ Context	prepass_context = 0;
 float3	lightPos; // used for pre-pass stage
 Buffer	photonBuffer;
 int photonSamples = 100; // number of samples in 360 degrees
-const int nPrePassIteration = 1000;
+const int nPrePassIteration = 5000;
 const int maxDepth = 3;
 
 std::vector<float3> photonPos;
@@ -456,9 +456,9 @@ void loadGeometry(Context& crtContext, std::string cudaFileName)
 	OptiXMesh mesh;
 	std::string filename = std::string(sutil::samplesDir()) + "/data/cow.obj";
 	mesh.context = crtContext;
-	mesh.material = specular;
+	mesh.material = diffuse;
 
-	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 180.f, 250.f)) * Matrix4x4::scale(make_float3(3000.f)));
+	loadMesh(filename, mesh, Matrix4x4::translate(make_float3(250.f, 0.f, 250.f)) * Matrix4x4::scale(make_float3(3000.f)));
 	gis.push_back(mesh.geom_instance);
 	gis.back()["diffuse_color"]->setFloat(red);
 	//setMaterial(gis.back(), diffuse, "diffuse_color", red);

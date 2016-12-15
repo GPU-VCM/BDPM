@@ -210,7 +210,7 @@ rtDeclareVariable(float,      t_hit,            rtIntersectionDistance, );
 
 RT_PROGRAM void diffuse()
 {
-	current_prd.done = true;
+	current_prd.done = false;
 
     float3 world_shading_normal   = normalize( rtTransformNormal( RT_OBJECT_TO_WORLD, shading_normal ) );
 
@@ -228,7 +228,7 @@ RT_PROGRAM void diffuse()
 	current_prd.direction = p;
 	current_prd.rayPdf *= M_1_PIf;
 
-	float radius = gridLength * 0.5f;
+	float radius = gridLength * 0.25f;
 	float resultx = (hitpoint.x - gridMin) / gridLength;
 	float resulty = (hitpoint.y - gridMin) / gridLength;
 	float resultz = (hitpoint.z - gridMin) / gridLength;
@@ -270,11 +270,17 @@ RT_PROGRAM void diffuse()
 				}
 				
 			}
-
+	// Russian roulette termination 
+	if (current_prd.depth >= 2)
+	{
+		float pcont = fmaxf(current_prd.attenuation);
+		if (rnd(current_prd.seed) >= pcont)
+			current_prd.done = true;
+	}
 	averageColor /= totalWeight;
 	averageColor *= counter;
 
-	float scale = 5.f;
+	float scale = 7.f;
 	current_prd.attenuation = averageColor / (scale * radius * radius);
     current_prd.countEmitted = false;
     

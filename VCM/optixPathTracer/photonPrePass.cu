@@ -165,7 +165,7 @@ RT_PROGRAM void pathtrace_camera()
 
 		// Be careful of calculating the indices!
 		photonBuffer[maxDepth * index + prd.depth].position = ray.origin + prd.tValue * ray.direction;
-		photonBuffer[maxDepth * index + prd.depth].color = prd.result;
+		photonBuffer[maxDepth * index + prd.depth].color = prd.result ;
         prd.depth++;
 		photonBuffer[maxDepth * index + prd.depth].rayDepth = prd.depth;
 		photonBuffer[maxDepth * index + prd.depth].rayPdf = prd.rayPdf;
